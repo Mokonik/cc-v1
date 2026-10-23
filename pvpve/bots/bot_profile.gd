@@ -4,6 +4,8 @@ extends Resource
 ## profiles stay simple: a few knobs, three presets.
 
 @export var display_name := "Bot"
+## 0 rookie, 1 regular, 2 veteran: also picks how well this bot does in its modeled PvE.
+@export_range(0, 2) var skill_level := 1
 ## Fastest the bot can turn its view, in degrees per second.
 @export_range(30.0, 720.0, 10.0) var aim_speed_deg := 220.0
 ## Standard deviation of the random aim error, in degrees.

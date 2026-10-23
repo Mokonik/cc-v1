@@ -7,6 +7,8 @@ var id := 0
 var def: WeaponDef
 var owner_id := 0
 var position := Vector3.ZERO
+## Where it was launched from; used to measure how far a shot travelled.
+var origin := Vector3.ZERO
 var velocity := Vector3.ZERO
 var spawn_tick := 0
 ## Draw strength (0-1). Scales an arrow's damage and speed; always 1 for abilities.

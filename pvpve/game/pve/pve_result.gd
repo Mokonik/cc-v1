@@ -16,6 +16,8 @@ var xp := 0
 var sabotage_points := 0
 ## Human-readable list of what was picked up ("Sword", "Health pack", ...).
 var loot: Array[String] = []
+## Weapon ids picked up (a repeat is a tier-up), so a modeled bot can be given the same gear.
+var weapon_loot: Array[StringName] = []
 var score := 0
 ## How the phase ended: boss_defeated, boss_timeout, time_up, stopped.
 var reason: StringName = &""

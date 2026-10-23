@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://world/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://world/graybox_arena.gd" id="2_arena"]
@@ -10,6 +10,9 @@
 [ext_resource type="Script" path="res://ui/combat_hud.gd" id="8_hud"]
 [ext_resource type="Script" path="res://fx/pve_view.gd" id="9_pve"]
 [ext_resource type="Script" path="res://ui/pve_hud.gd" id="10_pvehud"]
+[ext_resource type="Script" path="res://fx/match_view.gd" id="11_matchview"]
+[ext_resource type="Script" path="res://fx/match_sfx.gd" id="12_matchsfx"]
+[ext_resource type="Script" path="res://ui/match_hud.gd" id="13_matchhud"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -58,6 +61,15 @@ game = NodePath("../Game")
 script = ExtResource("9_pve")
 game = NodePath("../Game")
 
+[node name="MatchView" type="Node3D" parent="." node_paths=PackedStringArray("game", "world_environment")]
+script = ExtResource("11_matchview")
+game = NodePath("../Game")
+world_environment = NodePath("../WorldEnvironment")
+
+[node name="MatchSfx" type="Node" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("12_matchsfx")
+game = NodePath("../Game")
+
 [node name="CombatSfx" type="Node3D" parent="." node_paths=PackedStringArray("game")]
 script = ExtResource("7_sfx")
 game = NodePath("../Game")
@@ -68,6 +80,10 @@ game = NodePath("../Game")
 
 [node name="PveHud" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
 script = ExtResource("10_pvehud")
+game = NodePath("../Game")
+
+[node name="MatchHud" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("13_matchhud")
 game = NodePath("../Game")
 
 [node name="HUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]

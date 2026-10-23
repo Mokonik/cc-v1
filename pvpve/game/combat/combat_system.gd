@@ -11,12 +11,17 @@ const PROTECTION_SECONDS := 2.0
 const CHEST_HEIGHT := 1.0
 const BODY_CENTER_HEIGHT := 0.9
 const BODY_RADIUS := 0.4
+## A victim counts as airborne only if they are off the ground and this far above it, so
+## stepping off a ramp or a spawn settling onto the floor never counts as a skill kill.
+const AIRBORNE_HEIGHT := 0.6
 ## Splash falls off to this fraction of its center damage at the edge of the radius.
 const SPLASH_EDGE_FRACTION := 0.25
 ## Where a fired projectile starts, ahead of the eye, so it clears the shooter's own body.
 const PROJECTILE_START_OFFSET := 0.5
 
 var tick := 0
+## Off during the final: the dead stay dead.
+var respawn_enabled := true
 var seed_value := 1
 ## player id -> Vitals
 var vitals: Dictionary = {}
@@ -149,7 +154,8 @@ func cycle_weapon(player_id: int, direction: int) -> bool:
 
 ## Applies damage and returns how much was actually dealt (0 if the target is dead,
 ## protected, in god mode or unknown).
-func apply_damage(target_id: int, amount: float, source_id: int, weapon_id: StringName, position: Vector3) -> float:
+## context may carry: distance (float), full_power (bool), direct (bool). It only feeds kill_detail.
+func apply_damage(target_id: int, amount: float, source_id: int, weapon_id: StringName, position: Vector3, context := {}) -> float:
 	var v := get_vitals(target_id)
 	if v == null or not v.alive or v.god or tick < v.protected_until_tick or amount <= 0.0:
 		return 0.0
@@ -159,7 +165,7 @@ func apply_damage(target_id: int, amount: float, source_id: int, weapon_id: Stri
 	v.hp -= dealt
 	_events.damage_dealt.emit(target_id, source_id, dealt, position, weapon_id)
 	if v.hp <= 0.0:
-		_die(v, source_id, weapon_id)
+		_die(v, source_id, weapon_id, context)
 	return dealt
 
 
@@ -206,7 +212,24 @@ func kill(player_id: int, killer_id := 0, weapon_id: StringName = &"") -> void:
 	var v := get_vitals(player_id)
 	if v != null and v.alive:
 		v.hp = 0.0
-		_die(v, killer_id, weapon_id)
+		_die(v, killer_id, weapon_id, {})
+
+
+## Full health, fresh weapons and a short spawn protection, for the start of a round.
+func restore(player_id: int, protection_seconds := 0.0) -> void:
+	var v := get_vitals(player_id)
+	if v == null or not v.alive:
+		return
+	v.max_hp = Vitals.MAX_HP + v.stats.max_hp_bonus
+	v.hp = v.max_hp
+	v.slow_until_tick = 0
+	for state: WeaponState in v.weapons.values():
+		state.reset()
+	if protection_seconds > 0.0:
+		v.protected_until_tick = tick + WeaponDef.seconds_to_ticks(protection_seconds)
+		var body: Combatant = _get_body.call(player_id)
+		if body != null:
+			body.set_protected(true)
 
 
 ## Brings a dead player back immediately instead of waiting out the respawn timer.
@@ -216,7 +239,9 @@ func respawn_now(player_id: int) -> void:
 		v.respawn_tick = tick
 
 
-func _die(v: Vitals, killer_id: int, weapon_id: StringName) -> void:
+func _die(v: Vitals, killer_id: int, weapon_id: StringName, context: Dictionary) -> void:
+	var airborne_body: Combatant = _get_body.call(v.player_id)
+	var was_airborne := airborne_body != null and not v.is_monster and _is_airborne(airborne_body)
 	v.alive = false
 	v.hp = 0.0
 	v.deaths += 1
@@ -240,7 +265,30 @@ func _die(v: Vitals, killer_id: int, weapon_id: StringName) -> void:
 		var at := body.global_position if body != null else Vector3.ZERO
 		_events.monster_killed.emit(v.player_id, killer_id, at, v.monster_def_id)
 	else:
+		_events.kill_detail.emit(v.player_id, killer_id, weapon_id, _kill_distance(killer_id, body, context),
+			was_airborne, context.get("full_power", false), context.get("direct", true))
 		_events.player_died.emit(v.player_id, killer_id, weapon_id)
+
+
+func _is_airborne(body: Combatant) -> bool:
+	if body.is_on_floor():
+		return false
+	var from := body.global_position + Vector3(0.0, 0.05, 0.0)
+	var query := PhysicsRayQueryParameters3D.create(from, from + Vector3(0.0, -(AIRBORNE_HEIGHT + 0.5), 0.0), CombatLayers.WORLD)
+	var space: PhysicsDirectSpaceState3D = _get_space.call()
+	var ground := space.intersect_ray(query)
+	if ground.is_empty():
+		return true
+	return from.y - ground.position.y > AIRBORNE_HEIGHT
+
+
+func _kill_distance(killer_id: int, victim_body: Combatant, context: Dictionary) -> float:
+	if context.has("distance"):
+		return context.distance
+	var killer_body: Combatant = _get_body.call(killer_id) if killer_id != 0 else null
+	if killer_body != null and victim_body != null:
+		return killer_body.global_position.distance_to(victim_body.global_position)
+	return 0.0
 
 
 func _respawn(v: Vitals, player: Combatant) -> void:
@@ -271,7 +319,7 @@ func step(current_tick: int) -> void:
 		if body == null:
 			continue
 		if not v.alive:
-			if not v.is_monster and tick >= v.respawn_tick:
+			if not v.is_monster and respawn_enabled and tick >= v.respawn_tick:
 				_respawn(v, body)
 			continue
 		if v.protected_until_tick > 0 and tick >= v.protected_until_tick:
@@ -359,7 +407,7 @@ func _fire_hitscan(v: Vitals, player: Player, state: WeaponState, command: Playe
 			target_id = (hit.collider as Combatant).entity_id
 	_events.weapon_fired.emit(v.player_id, def.id, origin, direction, end_point)
 	if target_id != 0:
-		apply_damage(target_id, _damage_of(v, state), v.player_id, def.id, end_point)
+		apply_damage(target_id, _damage_of(v, state), v.player_id, def.id, end_point, {"distance": origin.distance_to(end_point)})
 	if def.uses_ammo() and state.ammo <= 0:
 		_begin_reload(v, state)
 
@@ -396,7 +444,7 @@ func _resolve_swing(v: Vitals, player: Player, state: WeaponState) -> void:
 			continue
 		if not _raycast(eye, chest, [player.get_rid(), other.get_rid()], CombatLayers.WORLD).is_empty():
 			continue
-		apply_damage(id, _damage_of(v, state), v.player_id, def.id, chest)
+		apply_damage(id, _damage_of(v, state), v.player_id, def.id, chest, {"distance": eye.distance_to(chest)})
 
 
 ## Bow: hold to draw, release to loose. Power (and so damage and speed) grows with the draw.
@@ -458,7 +506,11 @@ func _resolve_impact(impact: ProjectileSystem.Impact) -> void:
 	match impact.kind:
 		ProjectileSystem.Impact.Kind.PLAYER:
 			hit_player = impact.target_id
-			apply_damage(hit_player, projectile.damage, projectile.owner_id, def.id, impact.position)
+			apply_damage(hit_player, projectile.damage, projectile.owner_id, def.id, impact.position, {
+				"distance": projectile.origin.distance_to(impact.position),
+				"full_power": projectile.power >= 0.999 and def.kind == WeaponDef.Kind.PROJECTILE,
+				"direct": true,
+			})
 			if projectile.splash_radius > 0.0:
 				_explode(projectile, impact.position, hit_player)
 		ProjectileSystem.Impact.Kind.WORLD:
@@ -488,7 +540,10 @@ func _explode(projectile: Projectile, position: Vector3, skip_id: int) -> void:
 		if distance > projectile.splash_radius:
 			continue
 		var falloff := lerpf(1.0, SPLASH_EDGE_FRACTION, distance / projectile.splash_radius)
-		apply_damage(id, projectile.splash_damage * falloff, projectile.owner_id, def.id, center)
+		apply_damage(id, projectile.splash_damage * falloff, projectile.owner_id, def.id, center, {
+			"distance": projectile.origin.distance_to(center),
+			"direct": false,
+		})
 
 
 func _body_rid(player_id: int) -> RID:

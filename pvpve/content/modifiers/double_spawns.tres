@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ModifierDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/match/modifier_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"double_spawns"
+display_name = "Double Spawns"
+color = Color(1.0, 0.54, 0.31, 1)
+description = "Twice the monsters, and 15 points more loot chance on each."
+count_mult = 2.0
+loot_chance_bonus = 0.15

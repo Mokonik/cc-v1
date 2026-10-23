@@ -65,8 +65,8 @@ func get_inventory(player_id: int) -> Inventory:
 
 ## Rolls the monster's loot at its death position. Returns the drop, or null if nothing dropped.
 ## owner_id is the zone owner (0 = anywhere); killer_id gets their Scavenger bonus.
-func roll_drop(monster_id: int, def: MonsterDef, killer_id: int, owner_id: int, position: Vector3, wave: int) -> LootDrop:
-	var chance := def.loot_chance
+func roll_drop(monster_id: int, def: MonsterDef, killer_id: int, owner_id: int, position: Vector3, wave: int, bonus := 0.0) -> LootDrop:
+	var chance := def.loot_chance + bonus
 	var killer := _combat.get_vitals(killer_id)
 	if killer != null:
 		chance += killer.stats.loot_chance_bonus

@@ -23,6 +23,7 @@ func spawn(def: WeaponDef, owner_id: int, position: Vector3, velocity: Vector3, 
 	projectile.def = def
 	projectile.owner_id = owner_id
 	projectile.position = position
+	projectile.origin = position
 	projectile.velocity = velocity
 	projectile.power = power
 	projectile.spawn_tick = tick

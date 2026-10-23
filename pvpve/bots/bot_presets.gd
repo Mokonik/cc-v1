@@ -7,6 +7,7 @@ extends RefCounted
 ## 0 = easy, 1 = normal, 2 = hard.
 static func make(level: int) -> BotProfile:
 	var profile := BotProfile.new()
+	profile.skill_level = clampi(level, 0, 2)
 	match clampi(level, 0, 2):
 		0:
 			profile.display_name = "Rookie"

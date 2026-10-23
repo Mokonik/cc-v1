@@ -141,3 +141,38 @@ write("pve_config.tres", '''[gd_resource type="Resource" script_class="PveConfig
 [resource]
 script = ExtResource("1_cfg")
 ''')
+
+# ---- match config -----------------------------------------------------------------------------
+write("match_config.tres", '''[gd_resource type="Resource" script_class="MatchConfig" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/match/match_config.gd" id="1_cfg"]
+
+[resource]
+script = ExtResource("1_cfg")
+''')
+
+# ---- world modifiers ---------------------------------------------------------------------------
+MODIFIERS = {
+    "double_spawns": dict(display_name="Double Spawns", color=(1.0, 0.54, 0.31, 1),
+                          description="Twice the monsters, and 15 points more loot chance on each.",
+                          count_mult=2.0, loot_chance_bonus=0.15),
+    "elite_monsters": dict(display_name="Elite Monsters", color=(0.95, 0.35, 0.45, 1),
+                           description="Monsters have 50% more health and hit 30% harder, and give 50% more XP.",
+                           hp_mult=1.5, damage_mult=1.3, xp_mult=1.5),
+    "low_gravity": dict(display_name="Low Gravity", color=(0.6, 0.42, 1.0, 1),
+                        description="You fall slowly and jump much higher. Arrows and orbs are unchanged.",
+                        gravity_mult=0.55),
+    "fog": dict(display_name="Fog of War", color=(0.7, 0.75, 0.85, 1),
+                description="Thick fog. You see only nearby, and ranged monsters must come close.",
+                range_mult=0.5, fog_density=0.045),
+    "volatile": dict(display_name="Volatile", color=(1.0, 0.8, 0.2, 1),
+                     description="Monsters explode when they die: 20 damage to anyone within 3 m.",
+                     volatile_damage=20.0, volatile_radius=3.0),
+}
+for name, fields in MODIFIERS.items():
+    lines = ['[gd_resource type="Resource" script_class="ModifierDef" load_steps=2 format=3]', "",
+             '[ext_resource type="Script" path="res://game/match/modifier_def.gd" id="1_def"]', "",
+             "[resource]", 'script = ExtResource("1_def")', 'id = &"%s"' % name]
+    for key, value in fields.items():
+        lines.append("%s = %s" % (key, '"%s"' % value if isinstance(value, str) else fmt(value)))
+    write("modifiers/%s.tres" % name, "\n".join(lines) + "\n")

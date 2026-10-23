@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ModifierDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/match/modifier_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"volatile"
+display_name = "Volatile"
+color = Color(1.0, 0.8, 0.2, 1)
+description = "Monsters explode when they die: 20 damage to anyone within 3 m."
+volatile_damage = 20.0
+volatile_radius = 3.0

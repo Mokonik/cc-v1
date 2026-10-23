@@ -35,6 +35,9 @@ var _root: Node3D
 var _list_players: Callable
 ## Callable(id) -> Player or null.
 var _get_player: Callable
+## Callable(owner_id) -> ModifierAggregate: world modifiers that apply to that zone's monsters.
+var get_modifier: Callable
+var _neutral := ModifierAggregate.new()
 var _seed := 1
 var _next_id := FIRST_ID
 var _removals: Array[int] = []
@@ -194,10 +197,12 @@ func _think(record: Record, vitals: Vitals, tick: int, dt: float) -> void:
 	if has_target and record.agent.get_current_navigation_path().size() > 1:
 		waypoint = record.agent.get_next_path_position()
 
+	var modifiers: ModifierAggregate = get_modifier.call(record.owner_id) if get_modifier.is_valid() else _neutral
+	record.brain.range_mult = modifiers.range_mult
 	var command := record.brain.think(tick, node.global_position, node.rotation.y, target_pos, has_target,
 		has_los, waypoint, _separation(record), vitals.hp / vitals.max_hp, node.hit_wall)
 	node.face(command.yaw, dt)
-	node.simulate(command.move * command.speed, dt)
+	node.simulate(command.move * command.speed * modifiers.speed_mult, dt)
 
 	if command.telegraph != &"":
 		_events.monster_telegraph.emit(record.id, command.telegraph, command.telegraph_seconds)

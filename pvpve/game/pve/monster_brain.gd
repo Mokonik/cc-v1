@@ -37,6 +37,8 @@ var monster_id := 0
 var state := State.IDLE
 var enraged := false
 var summoned := false
+## Scales how far this monster can charge or spit (fog shortens it). Set by MonsterSystem.
+var range_mult := 1.0
 
 var _state_until := 0
 var _pending: StringName = &""
@@ -144,10 +146,10 @@ func _choose_ability(tick: int, distance: float, has_los: bool) -> StringName:
 		return &"slam"
 	if def.has_melee() and distance <= def.melee_range and tick >= _next_ready[&"melee"]:
 		return &"melee"
-	if def.has_charge() and has_los and distance >= CHARGE_MIN_DISTANCE and distance <= CHARGE_MAX_DISTANCE \
+	if def.has_charge() and has_los and distance >= CHARGE_MIN_DISTANCE and distance <= CHARGE_MAX_DISTANCE * range_mult \
 			and tick >= _next_ready[&"charge"]:
 		return &"charge"
-	if def.has_spit() and has_los and distance <= def.spit_range and distance >= SPIT_MIN_DISTANCE \
+	if def.has_spit() and has_los and distance <= def.spit_range * range_mult and distance >= SPIT_MIN_DISTANCE \
 			and tick >= _next_ready[&"spit"]:
 		return &"spit"
 	return &""

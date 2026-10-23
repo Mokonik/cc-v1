@@ -2,7 +2,7 @@
 
 3D first-person online PvPvE game: long PvE prep phase, then a PvP match that changes the next PvE phase, looping until a final match. See the project plan for the full design.
 
-**Status:** M0 (scaffold), M1 (first-person feel), M2 (solo foundation with bot rivals), M3 (combat) and M4 (PvE) are done. The match loop that ties PvE and PvP together is next (M5). Multiplayer is deliberately last (M8); until then everything is built and tested solo against bots, dummies and monsters.
+**Status:** M0 (scaffold), M1 (first-person feel), M2 (solo foundation with bot rivals), M3 (combat), M4 (PvE) and M5 (the match loop) are done. The sabotage twist is next (M6). Multiplayer is deliberately last (M8); until then everything is built and tested solo against bots, dummies and monsters.
 
 ## Run
 Open `pvpve/` in Godot 4.4+ and press F5. Use the same engine build as your friends.
@@ -57,6 +57,20 @@ Perks: Vitality, Swiftness, Marksman, Berserker, Quick Hands, Pyromancer, Iron S
 
 **Bots' PvE** is simulated, not played: `botpve [0-2]` runs the stat model (`BotPveModel`) for a bot and gives it the result exactly as a human would earn it, through the same scoring formula, XP, level-ups and perk choices. It faces the same wave schedule as a human; better skill and easier difficulty mean more kills, fewer deaths and a better chance at the boss. It is a stand-in for a friend, validated for consistency (monotonic in skill and difficulty, seeded), not for realism.
 
+## The match loop
+`match demo` plays a short match for you (an autopilot drives your character while you watch); `match start [cycles]` runs a real one, and `match fast` shortens every phase for testing. The real defaults are 3 cycles (set `cycles` in `content/match_config.tres`; 5 makes a long game), each:
+
+1. **PvE** (240 s): your own zone, as before. Bots get a modeled result when the phase ends.
+2. **PvE results**, then a secret **wager** (keys Z / X / C): stake 0, 25 or 50% of your standings total on how you place in PvP.
+3. **PvP** (120 s) in the arena: respawn deathmatch, bots shoot back. Kills score points; the wager pot is paid by placement (zero-sum).
+4. **PvP results**: the standings leader is **marked** (+0.35 PvE difficulty and a +25 bounty in PvP), and the PvP winner picks one of three **world modifiers** (Z / X / C) for everyone's next PvE: Double Spawns, Elite Monsters, Low Gravity, Fog of War or Volatile.
+
+After the last cycle comes **the final**: one life each, a shrinking safe area with escalating storm damage, last one alive wins. Placements award 400 / 200 / 100 / 0 points, and the champion is whoever has the highest **total** standings (PvE score + PvP points + wagers + final points), so the final matters but cannot erase a big lead. Loot resets every cycle; perks stay.
+
+**The twist that flips the table:** a *skill kill* (sword, a full-power arrow from 18 m or more, or any kill on someone who is airborne) earns +25 and steals half of the victim's PvP points from this match. A skill kill on the marked leader is a *Showstopper*: their PvP points are wiped, they lose 15% of their total (up to 150), and you take half of that on top of the bounty. Every number is in `match_config.tres`; the ledger (`standings`) shows where each point came from.
+
+Console: `match start|stop|skip|status|fast|demo|final|wager|pick`, `standings`, `mark <id|off>`, `modifier <id|off>`. `tools/match_shots.gd` saves screenshots of the match screens.
+
 ## Solo mode: bots, dummies and the dev console
 The game starts with you plus one bot standing in for a friend. Press `` ` `` for the dev console:
 
@@ -76,6 +90,7 @@ The game starts with you plus one bot standing in for a friend. Press `` ` `` fo
 | `monster <grunt\|spitter\|brute\|warden> [n]`, `monster clear` | Spawn monsters ahead of you in the sandbox (up to 12 per command) |
 | `pve start [seconds]`, `pve stop`, `pve skip`, `pve status` | Run, end, fast-forward to the boss, or inspect your PvE phase |
 | `difficulty [x]` | PvE difficulty for new phases |
+| `match ...`, `standings`, `mark`, `modifier` | The match loop (see above) |
 | `loot <sword\|bow\|orb\|pistol\|health\|trap\|xp>` | Drop a pickup at your feet |
 | `xp <n>`, `perk list`, `perk give <id>`, `sp <n>`, `heal` | Progression helpers |
 | `botpve [0-2] [bot id]` | Simulate a bot's PvE phase and show the result |
@@ -101,6 +116,6 @@ Everything is in `player/default_movement.tres` (a `MovementConfig`): speeds, ac
 The arena (`world/graybox_arena.gd`) has a run lane with 5 m markers, a tower of 1.1 m steps, a 20 degree ramp, pillars and cover. Known gap: there is no automatic step-up, so anything taller than a few centimeters must be jumped or climbed via the ramp.
 
 ## Tests
-`tools/run_tests.sh` imports the project and runs every `tests/*.gd` headless: movement math, jump buffer and coyote time, settings, arena and navmesh, player registry, spawning limits, dev commands, bot pathing and determinism, every weapon type (damage, timing, spread, walls, arcs, gravity, splash), death, respawn and protection, weapon switching, input mapping, deterministic fights, monster brains (every attack's timing, kiting, charge and stun, boss phases) and real monster fights, private zones, the run director (phases, wave scaling, caps, spawn rules, boss, results, scoring), loot, traps, health packs, XP, perks, Sabotage Points, the bot model, and the architecture rules. They run with `--fixed-fps` so they finish in under a minute while staying identical to a real-time run. `tools/godot.sh` runs Godot with a local binary, or the `/opt/godot-root` chroot in the cloud dev container.
+`tools/run_tests.sh` imports the project and runs every `tests/*.gd` headless: movement math, jump buffer and coyote time, settings, arena and navmesh, player registry, spawning limits, dev commands, bot pathing and determinism, every weapon type (damage, timing, spread, walls, arcs, gravity, splash), death, respawn and protection, weapon switching, input mapping, deterministic fights, monster brains (every attack's timing, kiting, charge and stun, boss phases) and real monster fights, private zones, the run director (phases, wave scaling, caps, spawn rules, boss, results, scoring), loot, traps, health packs, XP, perks, Sabotage Points, the bot model, the standings ledger and twist rules, wagers, world modifiers, a whole autopilot match from lobby to champion (run in two fresh processes to prove the same seed gives the same ledger), and the architecture rules. Two worlds in one process settle physics a hair differently, so reproducibility is per process: rerun with the same seed and you get the same match. They run with `--fixed-fps` so they finish in under a minute while staying identical to a real-time run. `tools/godot.sh` runs Godot with a local binary, or the `/opt/godot-root` chroot in the cloud dev container.
 
 `tools/screenshot.gd` renders the main scene to a PNG, and `tools/combat_shots.gd` plays a scripted fight and saves a screenshot of each weapon in action, and `tools/pve_shots.gd` does the same for a PvE phase (zone, telegraph, loot, perk offer, boss, results). Both need a display (or Xvfb with software GL) and are for checking visuals without opening the editor.

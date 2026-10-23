@@ -24,6 +24,8 @@ var player_id: int:
 var protected := false
 ## Perks and status effects scale walking speed through this (1.0 = unchanged).
 var speed_scale := 1.0
+## World modifiers (low gravity) scale gravity through this (1.0 = unchanged).
+var gravity_scale := 1.0
 ## The most recent command this player applied; CombatSystem reads it each tick.
 var last_command := PlayerCommand.new()
 
@@ -191,7 +193,7 @@ func simulate(move: Vector2, jump_pressed: bool, jump_held: bool, sprint: bool, 
 		_jump_active = false
 		velocity.y = maxf(velocity.y, 0.0)
 	else:
-		var g := config.gravity
+		var g := config.gravity * gravity_scale
 		if velocity.y < 0.0:
 			g *= config.fall_gravity_multiplier
 		velocity.y -= g * delta

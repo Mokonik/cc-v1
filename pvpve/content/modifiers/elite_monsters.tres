@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ModifierDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/match/modifier_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"elite_monsters"
+display_name = "Elite Monsters"
+color = Color(0.95, 0.35, 0.45, 1)
+description = "Monsters have 50% more health and hit 30% harder, and give 50% more XP."
+hp_mult = 1.5
+damage_mult = 1.3
+xp_mult = 1.5

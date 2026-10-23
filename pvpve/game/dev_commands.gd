@@ -8,6 +8,7 @@ const HELP := """Commands:
   help                  this list
   bot [0-2]             spawn a bot (0 rookie, 1 regular, 2 veteran)
   bot clear             remove all bots
+  botfire [on|off]      let bots use their weapons (off by default outside matches)
   players               list who is in the match (hp, kills, deaths)
   give <weapon|all>     give yourself pistol, sword, bow, orb (or all)
   weapons               list your weapons and ammo
@@ -21,6 +22,14 @@ const HELP := """Commands:
   monster clear         remove all monsters
   pve start [seconds]   enter your PvE zone and start a phase (default 240 s)
   pve stop | skip | status   end it, jump to the boss, or show progress
+  match start [cycles] | stop | skip | status   run the match loop (PvE, wager, PvP, ..., final)
+  match fast            short phases for quick testing (use before `match start`)
+  match demo [cycles]   fast match played by an autopilot while you watch
+  match final           jump straight to the final
+  match wager <1-3> | pick <1-3>   stake option / modifier card (same as keys Z X C)
+  standings             the table and where every point came from
+  mark <id|off>         put the leader mark on a player
+  modifier <id|off>     activate a world modifier (double_spawns, elite_monsters, low_gravity, fog, volatile)
   difficulty [x]        PvE difficulty for new phases (0.25-4, default 1)
   loot <sword|bow|orb|pistol|health|trap|xp>   drop that pickup at your feet
   xp <n>                give yourself XP (levels up and offers perks: keys Z X C)
@@ -48,6 +57,8 @@ static func run(line: String, game: Game) -> String:
 			return HELP
 		"bot":
 			return _bot(args, game)
+		"botfire":
+			return _botfire(args, game)
 		"players":
 			return _players(game)
 		"give":
@@ -68,6 +79,14 @@ static func run(line: String, game: Game) -> String:
 			return _monster(args, game)
 		"pve":
 			return _pve(args, game)
+		"match":
+			return _match(args, game)
+		"standings":
+			return _standings(game)
+		"mark":
+			return _mark(args, game)
+		"modifier":
+			return _modifier(args, game)
 		"difficulty":
 			return _difficulty(args, game)
 		"loot":
@@ -459,3 +478,116 @@ static func _botpve(args: PackedStringArray, game: Game) -> String:
 	return "Bot %d (skill %.2f): %s, %d kills, boss %s, %d deaths, score %d, +%d XP (level %d), +%d Sabotage Points." % [
 		bot_id, BotPveModel.skill_for_level(level), String(result.reason), result.kill_count(),
 		"defeated" if result.boss_defeated else "standing", result.deaths, result.score, result.xp, state.level, result.sabotage_points]
+
+
+static func _botfire(args: PackedStringArray, game: Game) -> String:
+	if args.is_empty():
+		return "Bots %s fire. Usage: botfire on|off" % ("do" if game.bots_fight else "do not")
+	match args[0].to_lower():
+		"on":
+			game.set_bots_fight(true)
+			return "Bots will shoot back."
+		"off":
+			game.set_bots_fight(false)
+			return "Bots are passive."
+	return "Usage: botfire on|off"
+
+
+static func _match(args: PackedStringArray, game: Game) -> String:
+	var director := game.match_director
+	var sub := args[0].to_lower() if not args.is_empty() else "status"
+	match sub:
+		"start":
+			var cycles := -1
+			if args.size() > 1:
+				if not args[1].is_valid_int() or args[1].to_int() < 1 or args[1].to_int() > 8:
+					return "Usage: match start [cycles 1-8]"
+				cycles = args[1].to_int()
+			var error := director.start(cycles)
+			return error if error != "" else "Match started: %d cycle(s) then the final." % director.config.cycles
+		"stop":
+			for id in director.members().duplicate():
+				game.set_autopilot(id, false)
+			return "Match stopped." if director.stop() else "No match is running."
+		"skip":
+			return "Skipped to the end of %s." % director.phase if director.skip() else "No match is running."
+		"fast":
+			if director.is_running():
+				return "Stop the match first."
+			var cycles := director.config.cycles
+			director.set_config(MatchPresets.fast())
+			director.config.cycles = cycles
+			return "Short phases on (PvE %.0f s, PvP %.0f s, final %.0f s)." % [director.config.pve_seconds, director.config.pvp_seconds, director.config.final_seconds]
+		"demo":
+			if director.is_running():
+				return "A match is already running."
+			var cycles := 2
+			if args.size() > 1:
+				if not args[1].is_valid_int() or args[1].to_int() < 1 or args[1].to_int() > 8:
+					return "Usage: match demo [cycles 1-8]"
+				cycles = args[1].to_int()
+			if game.registry.count() - game.registry.count_kind(PlayerRegistry.Kind.DUMMY) < 2:
+				game.spawn_player(PlayerRegistry.Kind.BOT, BotPresets.make(1))
+			director.set_config(MatchPresets.fast())
+			game.set_autopilot(PlayerRegistry.HOST_ID, true)
+			var error := director.start(cycles)
+			return error if error != "" else "Demo match: %d cycle(s), autopilot is playing for you. `match stop` to take over." % cycles
+		"final":
+			return "Jumped to the final." if director.jump_to_final() else "No match is running (or already in the final)."
+		"wager":
+			if args.size() < 2 or not args[1].is_valid_int():
+				return "Usage: match wager <1-3>"
+			return "Staked option %d." % args[1].to_int() if director.set_wager(PlayerRegistry.HOST_ID, args[1].to_int() - 1) else "Not possible now: wagers open between PvE and PvP."
+		"pick":
+			if args.size() < 2 or not args[1].is_valid_int():
+				return "Usage: match pick <1-3>"
+			return "Picked card %d." % args[1].to_int() if director.pick_modifier(args[1].to_int() - 1) else "No modifier cards on offer."
+		"status":
+			if not director.is_running():
+				return "No match running. `match start`, or `match demo` to watch one."
+			var leader := director.standings.leader()
+			return "%s, cycle %d/%d, %.0f s left. Leader: %d (%d pts). Mark: %s. Modifier: %s." % [
+				director.phase, mini(director.cycle, director.config.cycles), director.config.cycles, director.seconds_left(),
+				leader, director.standings.total(leader),
+				str(director.marked_id) if director.marked_id != 0 else "nobody",
+				game.modifiers.modifier_id if game.modifiers.is_active() else "none"]
+	return "Usage: match start [cycles] | stop | skip | status | fast | demo [cycles] | final | wager <1-3> | pick <1-3>"
+
+
+static func _standings(game: Game) -> String:
+	var director := game.match_director
+	var standings := director.standings
+	if standings.player_ids().is_empty():
+		return "No standings yet: start a match."
+	var lines: Array[String] = ["Standings (total = PvE + PvP + wagers + final):"]
+	for id in standings.ranking():
+		var name := game.registry.get_record(id).display_name if game.registry.get_record(id) != null else str(id)
+		lines.append("  %d. %-12s %5d   pve %d  pvp %d  wager %d  final %d%s" % [
+			standings.rank_of(id), name, standings.total(id), standings.sum_kinds(id, [&"pve"]),
+			standings.sum_kinds(id, Standings.PVP_KINDS), standings.sum_kinds(id, [&"wager"]), standings.sum_kinds(id, [&"final"]),
+			"   [MARKED]" if id == director.marked_id else ""])
+	return "\n".join(lines)
+
+
+static func _mark(args: PackedStringArray, game: Game) -> String:
+	if args.is_empty():
+		return "Usage: mark <player id|off>"
+	if args[0].to_lower() == "off":
+		game.match_director.set_mark(0)
+		return "Mark removed."
+	if not args[0].is_valid_int() or game.registry.get_record(args[0].to_int()) == null:
+		return "No such player."
+	game.match_director.set_mark(args[0].to_int())
+	return "Player %d is marked: +%.2f PvE difficulty and a bounty in PvP." % [args[0].to_int(), game.match_director.config.leader_difficulty_bonus]
+
+
+static func _modifier(args: PackedStringArray, game: Game) -> String:
+	if args.is_empty():
+		return "Usage: modifier <%s|off>. Active: %s" % ["|".join(game.modifier_defs.ids()), game.modifiers.modifier_id if game.modifiers.is_active() else "none"]
+	if args[0].to_lower() == "off":
+		game.modifiers.clear()
+		return "No world modifier."
+	var id := StringName(args[0].to_lower())
+	if not game.modifiers.set_active(id, PlayerRegistry.HOST_ID, game.match_director.config.modifier_scope):
+		return "Unknown modifier '%s'. Try: %s" % [args[0], ", ".join(game.modifier_defs.ids())]
+	return "%s is active: %s" % [game.modifier_defs.get_def(id).display_name, game.modifier_defs.get_def(id).description]

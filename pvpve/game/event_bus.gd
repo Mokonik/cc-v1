@@ -26,7 +26,12 @@ signal explosion(position: Vector3, radius: float, weapon_id: StringName)
 signal damage_dealt(target_id: int, source_id: int, amount: float, position: Vector3, weapon_id: StringName)
 signal player_died(victim_id: int, killer_id: int, weapon_id: StringName)
 signal player_respawned(player_id: int)
+## Raw facts about how a player died, for scoring rules. distance is killer-to-victim in meters,
+## airborne is whether the victim was off the ground, full_power is a fully drawn arrow, direct
+## is false for splash damage. killer_id is 0 for environmental deaths.
+signal kill_detail(victim_id: int, killer_id: int, weapon_id: StringName, distance: float, airborne: bool, full_power: bool, direct: bool)
 signal monster_killed(monster_id: int, killer_id: int, position: Vector3, def_id: StringName)
+signal monster_exploded(monster_id: int, position: Vector3, radius: float)
 signal weapon_tier_changed(player_id: int, weapon_id: StringName, tier: int)
 signal monster_spawned(monster_id: int, def_id: StringName, position: Vector3)
 ## A monster started winding up an attack ("melee", "spit", "slam" or "charge").
@@ -59,3 +64,18 @@ signal item_used(player_id: int, item: StringName, amount: float)
 signal trap_placed(trap_id: int, owner_id: int, position: Vector3)
 signal trap_armed(trap_id: int)
 signal trap_triggered(trap_id: int, victim_id: int, position: Vector3)
+
+# Match loop.
+## phase is one of lobby, pve, pve_results, wager, pvp_countdown, pvp, pvp_results, final, victory.
+signal match_started(cycles: int)
+signal match_phase(phase: StringName, cycle: int, seconds: float)
+signal match_finished(champion_id: int)
+signal standings_changed
+## kill_class is PvpRules.KillClass (0 normal, 1 skill, 2 showstopper).
+signal pvp_kill_scored(killer_id: int, victim_id: int, kill_class: int, killer_gain: int, victim_loss: int)
+signal mark_changed(player_id: int)
+signal wager_set(player_id: int, stake: int)
+signal wager_settled(net_changes: Dictionary)
+signal modifier_offered(picker_id: int, modifier_ids: Array)
+signal modifier_chosen(picker_id: int, modifier_id: StringName)
+signal final_zone(radius: float, center: Vector3)

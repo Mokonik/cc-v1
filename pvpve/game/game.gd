@@ -14,6 +14,7 @@ const BODY_COLORS: Array[Color] = [
 	Color(0.35, 0.8, 0.4),
 	Color(0.95, 0.7, 0.2),
 ]
+const NAV_SYNC_TICKS := 10
 const DUMMY_COLOR := Color(0.92, 0.55, 0.22)
 
 @export var arena: GrayboxArena
@@ -34,9 +35,17 @@ var pve := PveDirector.new()
 var progression := Progression.new()
 var perk_defs := PerkCatalog.new()
 var loot := LootSystem.new()
+var modifier_defs := ModifierCatalog.new()
+var modifiers := ModifierState.new(modifier_defs)
+var match_director := MatchDirector.new()
 ## Default difficulty for new PvE phases (1.0 = base). M5 raises it for the score leader.
 var pve_difficulty := 1.0
+## Whether bots may use their weapons. Matches turn it on for PvP and the final.
+var bots_fight := false
 var tick := 0
+## Humans driven by a bot brain (player id -> their own LocalInputSource, kept to restore later).
+var autopilot: Dictionary = {}
+var _bot_profiles: Dictionary = {}
 
 ## Where dummies reappear after dying (player id -> GrayboxArena.Spawn).
 var _homes: Dictionary = {}
@@ -47,6 +56,9 @@ func _ready() -> void:
 	monsters.setup(events, combat, monster_defs, monsters_root, get_opponents.bind(0), get_player)
 	zones.setup(zones_root)
 	pve.setup(events, combat, monsters, zones, monster_defs, get_player, load("res://content/pve_config.tres"))
+	match_director.setup(self)
+	monsters.get_modifier = modifiers.aggregate_for
+	pve.get_modifier = modifiers.aggregate_for
 	progression.setup(events, combat, perk_defs)
 	loot.setup(events, combat, progression, monster_defs, get_body, load("res://content/loot/default_loot.tres"))
 	events.monster_killed.connect(_on_monster_killed)
@@ -57,11 +69,22 @@ func _ready() -> void:
 
 func _physics_process(_delta: float) -> void:
 	tick += 1
+	if tick <= NAV_SYNC_TICKS:
+		# Make the first navigation queries independent of when the server's own sync lands.
+		NavigationServer3D.map_force_update(arena.get_world_3d().navigation_map)
 	combat.step(tick)
+	_apply_player_modifiers()
 	_process_player_actions()
 	monsters.step(tick)
 	pve.step(tick)
 	loot.step(tick)
+	match_director.step(tick)
+
+
+## Low gravity and friends reach the player bodies through their scale fields.
+func _apply_player_modifiers() -> void:
+	for player: Player in get_opponents(0):
+		player.gravity_scale = modifiers.aggregate_for(player.entity_id).gravity_mult
 
 
 func set_seed(value: int) -> void:
@@ -86,10 +109,7 @@ func spawn_player(kind: int, profile: BotProfile = null) -> Player:
 		local.events = events
 		source = local
 	else:
-		var bot := BotInputSource.new()
-		bot.get_opponents = get_opponents
-		bot.profile = profile if profile != null else BotPresets.make(1)
-		bot.rng_seed = hash([seed_value, record.id])
+		var bot := _make_bot_source(record.id, profile if profile != null else BotPresets.make(1))
 		record.display_name = "%s %d" % [bot.profile.display_name, record.id]
 		source = bot
 
@@ -98,12 +118,56 @@ func spawn_player(kind: int, profile: BotProfile = null) -> Player:
 	player.global_position = spawn.position
 	player.set_look(spawn.yaw, 0.0)
 	player.set_body_color(BODY_COLORS[(record.id - 1) % BODY_COLORS.size()])
-	# Bots only move in M3: they are targets, and do not fire back yet.
-	combat.register(record.id, kind == PlayerRegistry.Kind.HUMAN)
+	# Bots are targets in the sandbox; they fight only while bots_fight is on (matches turn it on).
+	combat.register(record.id, kind == PlayerRegistry.Kind.HUMAN or bots_fight)
 	progression.register(record.id)
 	loot.register(record.id)
 	events.player_spawned.emit(record.id)
 	return player
+
+
+func _make_bot_source(id: int, profile: BotProfile) -> BotInputSource:
+	var bot := BotInputSource.new()
+	bot.get_opponents = get_opponents
+	bot.get_loadout = get_loadout
+	bot.profile = profile
+	bot.rng_seed = hash([seed_value, id])
+	_bot_profiles[id] = profile
+	return bot
+
+
+## Lets a bot brain play a human's character (the demo / watch-it-play mode), or hands it back.
+func set_autopilot(player_id: int, enabled: bool) -> bool:
+	var player := get_player(player_id)
+	var record := registry.get_record(player_id)
+	if player == null or record == null or record.kind != PlayerRegistry.Kind.HUMAN:
+		return false
+	if enabled == autopilot.has(player_id):
+		return true
+	if enabled:
+		var bot := _make_bot_source(player_id, BotPresets.make(1))
+		autopilot[player_id] = player.input_source
+		player.add_child(bot)
+		player.input_source = bot
+		bot.set_view(player.rotation.y, 0.0)
+	else:
+		var bot := player.input_source
+		player.input_source = autopilot[player_id]
+		autopilot.erase(player_id)
+		bot.queue_free()
+	return true
+
+
+## The PvE skill level (0-2) of a bot or autopilot player.
+func skill_level_of(player_id: int) -> int:
+	var profile: BotProfile = _bot_profiles.get(player_id)
+	return profile.skill_level if profile != null else 1
+
+
+## True for bots and for humans on autopilot: their PvE comes from the stat model.
+func is_modeled(player_id: int) -> bool:
+	var record := registry.get_record(player_id)
+	return record != null and (record.kind == PlayerRegistry.Kind.BOT or autopilot.has(player_id))
 
 
 ## Spawns a target dummy at a ground position. Returns null at the dummy limit.
@@ -158,6 +222,24 @@ func get_player(id: int) -> Player:
 	if record != null and is_instance_valid(record.player):
 		return record.player
 	return null
+
+
+## Lets bots shoot and swing (or not). Applies to every bot now and to bots spawned later.
+func set_bots_fight(enabled: bool) -> void:
+	bots_fight = enabled
+	for id in registry.ids():
+		if registry.get_record(id).kind == PlayerRegistry.Kind.BOT:
+			var vitals := combat.get_vitals(id)
+			if vitals != null:
+				vitals.accepts_commands = enabled
+
+
+## What a bot is holding, for its weapon chooser.
+func get_loadout(id: int) -> Dictionary:
+	var vitals := combat.get_vitals(id)
+	if vitals == null:
+		return {}
+	return {"owned": vitals.owned_slots(), "current": vitals.current_slot}
 
 
 ## Any combatant by entity id: a player, and (later) a monster.
@@ -242,18 +324,21 @@ func _spawn_for(id: int) -> GrayboxArena.Spawn:
 ## Runs a bot's PvE phase through the stat model instead of a real zone, then gives the bot the
 ## results exactly as a human would earn them: XP (and so level-ups and perks), Sabotage Points
 ## and a recorded result. level selects the skill (0 rookie, 1 regular, 2 veteran).
-func run_bot_pve(bot_id: int, level := 1, effects: BotPveModel.Effects = null) -> PveResult:
-	var record := registry.get_record(bot_id)
-	if record == null or record.kind != PlayerRegistry.Kind.BOT:
+func run_bot_pve(bot_id: int, level := 1, effects: BotPveModel.Effects = null, difficulty := -1.0) -> PveResult:
+	if not is_modeled(bot_id):
 		return null
 	var config: PveConfig = pve.base_config().duplicate()
-	config.difficulty = pve_difficulty
+	config.difficulty = difficulty if difficulty > 0.0 else pve_difficulty
+	if effects == null:
+		effects = modifiers.aggregate_for(bot_id).bot_effects()
 	var result := BotPveModel.simulate(BotPveModel.skill_for_level(level), config, monster_defs, seed_value, bot_id, effects)
 	progression.grant_xp(bot_id, result.xp)
 	progression.grant_sabotage_points(bot_id, result.sabotage_points)
 	var state := progression.get_state(bot_id)
 	while state.has_pending_offer():
 		progression.pick_perk(bot_id, BotPerkPicker.choose(state.offers[0]))
+	for weapon_id in result.weapon_loot:
+		combat.grant_weapon_loot(bot_id, weapon_id)
 	pve.last_results[bot_id] = result
 	return result
 
@@ -266,11 +351,16 @@ func _on_monster_killed(monster_id: int, killer_id: int, position: Vector3, def_
 		var points := 0
 		if progression.get_state(killer_id) != null:
 			var killer_stats := combat.get_vitals(killer_id).stats
-			xp = def.xp
+			xp = roundi(def.xp * modifiers.aggregate_for(record.owner_id).xp_mult)
 			points = def.sabotage_points + killer_stats.sabotage_point_bonus
 			progression.grant_xp(killer_id, xp)
 			progression.grant_sabotage_points(killer_id, points)
-		loot.roll_drop(monster_id, def, killer_id, record.owner_id, position + Vector3(0.0, 0.4, 0.0), record.wave)
+		var modifier := modifiers.aggregate_for(record.owner_id)
+		loot.roll_drop(monster_id, def, killer_id, record.owner_id, position + Vector3(0.0, 0.4, 0.0), record.wave, modifier.loot_chance_bonus)
+		if modifier.volatile_damage > 0.0:
+			# Volatile: the corpse bursts and hurts players only (never other monsters).
+			events.monster_exploded.emit(monster_id, position, modifier.volatile_radius)
+			combat.area_damage(monster_id, position, modifier.volatile_radius, modifier.volatile_damage, &"volatile")
 		pve.record_kill(record.owner_id, def_id, monster_id, xp, points)
 	monsters.mark_dead(monster_id)
 
@@ -291,7 +381,7 @@ func _process_player_actions() -> void:
 			loot.use_health_pack(id)
 		if command.place_trap:
 			loot.place_trap(id)
-		if command.perk_pick != 0:
+		if command.perk_pick != 0 and not match_director.choose(id, command.perk_pick):
 			progression.pick_perk(id, command.perk_pick)
 
 

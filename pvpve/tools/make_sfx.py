@@ -142,6 +142,30 @@ def main():
         gain(decay(lowpass(noise(rng, n(0.45)), 0.05), 2.0), 0.7),
         gain(sweep(80, 130, 0.45), 0.15)))
 
+    write("phase", mix(
+        decay(sweep(330, 330, 0.18), 3.0),
+        delay(decay(sweep(494, 494, 0.3), 3.5), 0.12)))
+    write("chip", mix(
+        decay(sweep(1800, 1700, 0.05), 6.0),
+        delay(decay(sweep(2400, 2300, 0.07), 6.0), 0.05)))
+    write("sting", mix(
+        decay(sweep(392, 392, 0.12), 3.0),
+        delay(decay(sweep(523, 523, 0.12), 3.0), 0.08),
+        delay(decay(sweep(784, 784, 0.4), 2.5), 0.16),
+        gain(decay(lowpass(noise(rng, n(0.1)), 0.5), 12.0), 0.5)))
+    write("flip", mix(
+        decay(sweep(900, 60, 0.7, 0.6), 2.2),
+        gain(decay(lowpass(noise(rng, n(0.6)), 0.2), 3.5), 0.9),
+        delay(decay(sweep(110, 55, 0.5), 3.0), 0.25)))
+    write("ring", mix(
+        decay(sweep(260, 260, 0.2), 4.0),
+        delay(decay(sweep(260, 260, 0.2), 4.0), 0.3)))
+    write("victory", mix(
+        decay(sweep(523, 523, 0.25), 2.5),
+        delay(decay(sweep(659, 659, 0.25), 2.5), 0.2),
+        delay(decay(sweep(784, 784, 0.25), 2.5), 0.4),
+        delay(decay(sweep(1047, 1047, 0.9), 2.0), 0.6)))
+
 
 if __name__ == "__main__":
     main()

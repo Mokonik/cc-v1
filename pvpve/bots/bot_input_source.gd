@@ -4,10 +4,16 @@ extends InputSource
 ## Adds what BotBrain deliberately does not know about: navigation and line-of-sight.
 
 const REPATH_SECONDS := 0.2
+## Inside this range the bot swaps to the sword if it has one.
+const SWORD_RANGE := 3.2
+const PISTOL_SLOT := 1
+const SWORD_SLOT := 2
 
 ## Returns the living opponents of a given player id (supplied by Game, which owns who is
 ## playing). A callable rather than a Game reference keeps bots independent of the authority layer.
 var get_opponents: Callable
+## Callable(id) -> Dictionary {"owned": Array[int] of slots, "current": int}: what the bot is holding.
+var get_loadout: Callable
 var profile: BotProfile
 var rng_seed := 0
 
@@ -51,7 +57,24 @@ func poll(delta: float) -> PlayerCommand:
 	else:
 		target_id = 0
 	last_command = _brain.think(delta, me, target, _waypoint, has_los)
+	if target != null:
+		_choose_weapon(last_command, me, target)
 	return last_command
+
+
+## Sword up close, pistol otherwise. Only asks for a swap when the choice differs from what is held.
+func _choose_weapon(command: PlayerCommand, me: Player, target: Player) -> void:
+	if not get_loadout.is_valid():
+		return
+	var loadout: Dictionary = get_loadout.call(me.player_id)
+	var owned: Array = loadout.get("owned", [])
+	var current: int = loadout.get("current", 0)
+	var wanted := PISTOL_SLOT
+	var distance := me.global_position.distance_to(target.global_position)
+	if distance <= SWORD_RANGE and owned.has(SWORD_SLOT):
+		wanted = SWORD_SLOT
+	if owned.has(wanted) and current != wanted:
+		command.weapon_slot = wanted
 
 
 func _setup(me: Player) -> void:

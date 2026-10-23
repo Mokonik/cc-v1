@@ -91,8 +91,23 @@ static func simulate(skill: float, config: PveConfig, monsters: MonsterCatalog, 
 		result.reason = &"boss_defeated"
 	else:
 		result.reason = &"boss_timeout" if run_config.boss_enabled else &"time_up"
+	_roll_weapon_loot(result, clear_share, seed_value, player_id)
 	result.score = PveScoring.score(result, monsters)
 	return result
+
+
+## A stronger phase means more and better gear: each weapon is found with a chance that rises
+## with how much the bot cleared, and a chance of a second copy (a tier-up).
+static func _roll_weapon_loot(result: PveResult, clear_share: float, seed_value: int, player_id: int) -> void:
+	var weapons: Array[StringName] = [&"sword", &"bow", &"orb", &"pistol"]
+	for i in weapons.size():
+		var chance := clampf(0.12 + 0.7 * clear_share, 0.0, 0.9) * (0.75 if weapons[i] == &"orb" else 1.0)
+		if _roll(seed_value, player_id, 200 + i) < chance:
+			result.weapon_loot.append(weapons[i])
+			result.loot.append(String(weapons[i]).capitalize())
+			if _roll(seed_value, player_id, 300 + i) < chance * 0.5:
+				result.weapon_loot.append(weapons[i])
+				result.loot.append(String(weapons[i]).capitalize())
 
 
 ## Chance the boss falls, as a deterministic yes/no from the seed.

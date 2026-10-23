@@ -165,7 +165,8 @@ func _on_wave(owner_id: int, wave: int, count: int) -> void:
 
 
 func _on_finished(owner_id: int, result: PveResult, reason: StringName) -> void:
-	if owner_id != PlayerRegistry.HOST_ID:
+	# During a match the match HUD shows the results table instead.
+	if owner_id != PlayerRegistry.HOST_ID or game.match_director.is_running():
 		return
 	var headline: String = {
 		&"boss_defeated": "VICTORY",

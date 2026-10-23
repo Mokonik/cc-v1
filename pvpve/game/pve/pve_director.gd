@@ -47,6 +47,9 @@ var _zones: ZoneManager
 var _catalog: MonsterCatalog
 var _get_player: Callable
 var _base_config: PveConfig
+## Callable(owner_id) -> ModifierAggregate: world modifiers that apply to that player's phase.
+var get_modifier: Callable
+var _neutral := ModifierAggregate.new()
 var _seed := 1
 var _tick := 0
 
@@ -234,8 +237,8 @@ func _begin_boss(run: Run) -> void:
 		"def_id": run.config.boss_id,
 		"gate": gate,
 		"wave": run.waves_started,
-		"hp_mult": _hp_mult(run, 1),
-		"damage_mult": _damage_mult(run),
+		"hp_mult": _hp_mult(run, 1) * _modifier(run).hp_mult,
+		"damage_mult": _damage_mult(run) * _modifier(run).damage_mult,
 		"is_boss": true,
 	})
 
@@ -244,7 +247,8 @@ func _spawn_wave(run: Run, tick: int) -> void:
 	run.waves_started += 1
 	var wave := run.waves_started
 	var config := run.config
-	var wanted := roundi((config.base_wave_size + config.wave_growth * (wave - 1)) * config.difficulty)
+	var modifier := _modifier(run)
+	var wanted := roundi((config.base_wave_size + config.wave_growth * (wave - 1)) * config.difficulty * modifier.count_mult)
 	var alive := _monsters.count_owned_by(run.owner_id) + run.pending.size()
 	var count := mini(wanted, maxi(config.alive_cap - alive, 0))
 	var gates := _usable_gates(run)
@@ -256,8 +260,8 @@ func _spawn_wave(run: Run, tick: int) -> void:
 			"def_id": _pick_type(run, wave, i),
 			"gate": gate,
 			"wave": wave,
-			"hp_mult": _hp_mult(run, wave),
-			"damage_mult": _damage_mult(run),
+			"hp_mult": _hp_mult(run, wave) * modifier.hp_mult,
+			"damage_mult": _damage_mult(run) * modifier.damage_mult,
 			"is_boss": false,
 		})
 		_events.gate_pulse.emit(run.owner_id, gate, config.spawn_telegraph + i * SPAWN_STAGGER_TICKS / float(Engine.physics_ticks_per_second))
@@ -305,6 +309,10 @@ func _finish(run: Run, reason: StringName) -> void:
 
 
 # ---- scaling and choices ----------------------------------------------------------------
+
+func _modifier(run: Run) -> ModifierAggregate:
+	return get_modifier.call(run.owner_id) if get_modifier.is_valid() else _neutral
+
 
 func _hp_mult(run: Run, wave: int) -> float:
 	return (1.0 + (run.config.difficulty - 1.0) * HP_PER_DIFFICULTY) * (1.0 + HP_PER_WAVE * (wave - 1))
