@@ -47,6 +47,10 @@ extends Resource
 ## Sideways camera roll (degrees) at full strafe speed.
 @export_range(0.0, 6.0, 0.1) var strafe_tilt_deg := 1.5
 @export_range(1.0, 30.0, 0.5) var tilt_smoothing := 12.0
+## How quickly recoil kick settles back to the aim point.
+@export_range(1.0, 40.0, 0.5) var recoil_recovery := 12.0
+## How quickly damage screen shake dies down, in shake units per second.
+@export_range(0.5, 10.0, 0.5) var shake_decay := 3.0
 
 @export_group("Head bob and landing")
 ## Meters of bob travel per radian of step phase; higher = faster steps.

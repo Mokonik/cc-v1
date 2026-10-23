@@ -1,10 +1,13 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://world/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://world/graybox_arena.gd" id="2_arena"]
 [ext_resource type="Script" path="res://game/game.gd" id="3_game"]
 [ext_resource type="Script" path="res://ui/debug_hud.gd" id="4_hud"]
 [ext_resource type="Script" path="res://ui/dev_console.gd" id="5_console"]
+[ext_resource type="Script" path="res://fx/combat_view.gd" id="6_view"]
+[ext_resource type="Script" path="res://fx/combat_sfx.gd" id="7_sfx"]
+[ext_resource type="Script" path="res://ui/combat_hud.gd" id="8_hud"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -38,6 +41,18 @@ script = ExtResource("2_arena")
 script = ExtResource("3_game")
 arena = NodePath("../Arena")
 players_root = NodePath("../Players")
+
+[node name="CombatView" type="Node3D" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("6_view")
+game = NodePath("../Game")
+
+[node name="CombatSfx" type="Node3D" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("7_sfx")
+game = NodePath("../Game")
+
+[node name="CombatHud" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("8_hud")
+game = NodePath("../Game")
 
 [node name="HUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
 script = ExtResource("4_hud")

@@ -39,7 +39,24 @@ func poll(_delta: float) -> PlayerCommand:
 	command.jump_pressed = Input.is_action_just_pressed(&"jump")
 	command.jump_held = Input.is_action_pressed(&"jump")
 	command.sprint = Input.is_action_pressed(&"sprint")
+	if _can_use_weapons():
+		command.fire_pressed = Input.is_action_just_pressed(&"fire")
+		command.fire_held = Input.is_action_pressed(&"fire")
+		command.fire_released = Input.is_action_just_released(&"fire")
+	command.reload_pressed = Input.is_action_just_pressed(&"reload")
+	for slot in range(1, 5):
+		if Input.is_action_just_pressed(StringName("slot_%d" % slot)):
+			command.weapon_slot = slot
+	if Input.is_action_just_pressed(&"weapon_next"):
+		command.weapon_cycle = 1
+	elif Input.is_action_just_pressed(&"weapon_prev"):
+		command.weapon_cycle = -1
 	return command
+
+
+## The click that recaptures the mouse must not also fire a shot.
+func _can_use_weapons() -> bool:
+	return DisplayServer.get_name() == "headless" or Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 
 
 func _unhandled_input(event: InputEvent) -> void:

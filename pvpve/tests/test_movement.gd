@@ -264,7 +264,7 @@ func _test_input_actions() -> void:
 	print("input actions")
 	InputSetup.ensure_actions()
 	var counts := {}
-	for action: StringName in InputSetup.ACTIONS:
+	for action in InputSetup.all_actions():
 		_check(InputMap.has_action(action), "action %s exists" % action)
 		counts[action] = InputMap.action_get_events(action).size()
 	InputSetup.ensure_actions()

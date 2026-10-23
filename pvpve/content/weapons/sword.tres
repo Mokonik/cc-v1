@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/combat/weapon_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"sword"
+display_name = "Sword"
+kind = 1
+slot = 2
+damage = 20.0
+fire_interval = 0.8
+reach = 2.4
+magazine = 0
+windup = 0.25
+arc_deg = 110.0
+recoil_pitch_deg = 0.0
+recoil_yaw_deg = 0.0
+viewmodel_kick = 0.0

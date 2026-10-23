@@ -6,6 +6,7 @@ extends CharacterBody3D
 ## simulate() is pure movement so it can be tested headless and replayed.
 
 const EYE_HEIGHT := 1.6
+const COLLISION_LAYER := 2
 
 signal jumped
 signal landed(impact_speed: float)
@@ -16,6 +17,10 @@ signal landed(impact_speed: float)
 
 var player_id := 0
 var display_name := ""
+var alive := true
+var protected := false
+## The most recent command this player applied; CombatSystem reads it each tick.
+var last_command := PlayerCommand.new()
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -36,6 +41,12 @@ var _bob_phase := 0.0
 var _bob_amount := 0.0
 var _land_offset := 0.0
 var _head_rest := Vector3.ZERO
+
+var _recoil := Vector2.ZERO
+var _shake := 0.0
+var _death_blend := 0.0
+var _body_material: StandardMaterial3D
+var _clock := 0.0
 
 
 func _ready() -> void:
@@ -58,11 +69,27 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	_clock += delta
 	_update_look(delta)
 	_update_camera(delta)
+	_update_shimmer()
+
+
+func _update_shimmer() -> void:
+	if _body_material == null or not protected:
+		return
+	_body_material.emission_enabled = true
+	_body_material.emission = Color(0.4, 0.75, 1.0) * (0.5 + 0.4 * sin(_clock * 14.0))
 
 
 func apply_command(command: PlayerCommand, delta: float) -> void:
+	if not alive:
+		# A dead player keeps their view but cannot move or act.
+		var held := PlayerCommand.new()
+		held.yaw = _look_yaw
+		held.pitch = _look_pitch
+		command = held
+	last_command = command
 	_look_yaw = command.yaw
 	_look_pitch = clampf(command.pitch, -config.max_pitch, config.max_pitch)
 	simulate(command.move, command.jump_pressed, command.jump_held, command.sprint, delta)
@@ -81,12 +108,59 @@ func set_look(yaw: float, pitch: float) -> void:
 
 
 func set_body_color(color: Color) -> void:
-	var body_material := StandardMaterial3D.new()
-	body_material.albedo_color = color
-	body.material_override = body_material
+	_body_material = StandardMaterial3D.new()
+	_body_material.albedo_color = color
+	body.material_override = _body_material
 	var visor_material := StandardMaterial3D.new()
 	visor_material.albedo_color = Color(0.08, 0.1, 0.12)
 	visor.material_override = visor_material
+
+
+## The point shots and views originate from (the true eye, without head bob).
+func eye_position() -> Vector3:
+	return global_position + Vector3(0.0, EYE_HEIGHT, 0.0)
+
+
+## Unit view vector for yaw and pitch (yaw 0 faces -Z, positive pitch looks up).
+static func direction_from(yaw: float, pitch: float) -> Vector3:
+	return Vector3(-sin(yaw) * cos(pitch), sin(pitch), -cos(yaw) * cos(pitch))
+
+
+func set_alive(value: bool) -> void:
+	if alive == value:
+		return
+	alive = value
+	collision_layer = COLLISION_LAYER if alive else 0
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(body, "rotation:x", 0.0 if alive else -PI / 2.0, 0.35)
+	tween.tween_property(body, "position:y", 0.9 if alive else 0.4, 0.35)
+
+
+## Spawn protection flag; only drives a visual shimmer, the rule lives in CombatSystem.
+func set_protected(value: bool) -> void:
+	protected = value
+	if not value and _body_material != null:
+		_body_material.emission_enabled = false
+
+
+## Moves the player back into play (respawn) with a clean slate.
+func respawn_at(position: Vector3, yaw: float) -> void:
+	global_position = position
+	velocity = Vector3.ZERO
+	_recoil = Vector2.ZERO
+	_shake = 0.0
+	set_look(yaw, 0.0)
+	set_alive(true)
+
+
+## Camera kick in radians. Purely visual: it never changes where shots go.
+func add_recoil(pitch: float, yaw: float) -> void:
+	_recoil += Vector2(pitch, yaw)
+
+
+## Screen shake, roughly 0 to 1.
+func add_shake(amount: float) -> void:
+	_shake = clampf(_shake + amount, 0.0, 1.0)
 
 
 func get_horizontal_speed() -> float:
@@ -170,7 +244,8 @@ func _update_look(delta: float) -> void:
 		_yaw = lerpf(_yaw, _look_yaw, t)
 		_pitch = lerpf(_pitch, _look_pitch, t)
 	rotation.y = _yaw
-	head.rotation.x = _pitch
+	head.rotation.x = clampf(_pitch + _recoil.x, -PI / 2.0, PI / 2.0)
+	head.rotation.y = _recoil.y
 
 
 func _update_camera(delta: float) -> void:
@@ -184,7 +259,11 @@ func _update_camera(delta: float) -> void:
 	bob *= config.bob_amplitude * _bob_amount * speed_ratio
 
 	_land_offset = lerpf(_land_offset, 0.0, 1.0 - exp(-config.land_recover * delta))
-	head.position = _head_rest + bob - Vector3(0.0, _land_offset, 0.0)
+	_recoil = _recoil.lerp(Vector2.ZERO, 1.0 - exp(-config.recoil_recovery * delta))
+	_shake = move_toward(_shake, 0.0, config.shake_decay * delta)
+	_death_blend = move_toward(_death_blend, 0.0 if alive else 1.0, delta * 2.5)
+	var shake_offset := Vector3(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0), 0.0) * _shake * 0.04
+	head.position = _head_rest + bob + shake_offset - Vector3(0.0, _land_offset + 1.25 * _death_blend, 0.0)
 
 	var sprint_blend := clampf((h_speed - config.walk_speed) / maxf(config.sprint_speed - config.walk_speed, 0.01), 0.0, 1.0)
 	var fov_target := PlayerSettings.fov + config.sprint_fov_kick * sprint_blend
@@ -192,4 +271,5 @@ func _update_camera(delta: float) -> void:
 
 	var side_ratio := clampf(global_transform.basis.x.dot(velocity) / config.sprint_speed, -1.0, 1.0)
 	var roll_target := deg_to_rad(-config.strafe_tilt_deg) * side_ratio
+	roll_target += deg_to_rad(70.0) * _death_blend
 	camera.rotation.z = lerp_angle(camera.rotation.z, roll_target, 1.0 - exp(-config.tilt_smoothing * delta))

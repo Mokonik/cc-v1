@@ -4,7 +4,7 @@ extends RefCounted
 ## never by node, so the same ids can travel over the network later.
 ## The human host is always id 1 (the Godot convention for the server peer).
 
-enum Kind { HUMAN, BOT }
+enum Kind { HUMAN, BOT, DUMMY }
 
 const HOST_ID := 1
 

@@ -29,12 +29,13 @@ func _process(_delta: float) -> void:
 		var cfg := player.config
 		lines.append("Speed %.1f m/s  (walk %.1f / sprint %.1f)" % [player.get_horizontal_speed(), cfg.walk_speed, cfg.sprint_speed])
 		lines.append("Vertical %.1f m/s   %s" % [player.velocity.y, "grounded" if player.is_on_floor() else "airborne"])
-	lines.append("Players: %d human, %d bots" % [
+	lines.append("Players: %d human, %d bots, %d dummies" % [
 		game.registry.count_kind(PlayerRegistry.Kind.HUMAN),
-		game.registry.count_kind(PlayerRegistry.Kind.BOT)])
+		game.registry.count_kind(PlayerRegistry.Kind.BOT),
+		game.registry.count_kind(PlayerRegistry.Kind.DUMMY)])
 	lines.append("Sensitivity %.4f   ([ / ] to change)" % PlayerSettings.mouse_sensitivity)
 	lines.append("")
-	lines.append("WASD move  |  Space jump  |  Shift sprint  |  ` console  |  Esc release mouse  |  F3 hide")
+	lines.append("WASD move | Space jump | Shift sprint | LMB fire | R reload | 1-4 / wheel weapon | ` console | Esc mouse | F3 hide")
 	_label.text = "\n".join(lines)
 
 

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/combat/weapon_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"bow"
+display_name = "Bow"
+kind = 2
+slot = 3
+damage = 30.0
+fire_interval = 1.0
+magazine = 0
+projectile_speed = 45.0
+projectile_gravity = 9.8
+projectile_lifetime = 5.0
+draw_time = 0.7
+min_power = 0.35
+recoil_pitch_deg = 1.5
+recoil_yaw_deg = 0.0
+viewmodel_kick = 0.08

@@ -2,3 +2,4 @@
 *.translation
 export/
 shot_*.png
+shots*/

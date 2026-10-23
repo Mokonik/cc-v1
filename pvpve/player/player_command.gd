@@ -11,5 +11,12 @@ var sprint := false
 ## Absolute view angles in radians (yaw 0 faces -Z, positive pitch looks up).
 var yaw := 0.0
 var pitch := 0.0
-## Unused until combat lands in M3; bots already set it so their aiming is testable.
+## Primary action (shoot, swing, draw, cast). Bots set fire_held as an intent signal.
+var fire_pressed := false
 var fire_held := false
+var fire_released := false
+var reload_pressed := false
+## 1-4 selects that weapon slot; 0 means no change.
+var weapon_slot := 0
+## +1 / -1 cycles to the next / previous owned weapon; 0 means no change.
+var weapon_cycle := 0

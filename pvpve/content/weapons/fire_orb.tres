@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/combat/weapon_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"orb"
+display_name = "Fire Orb"
+kind = 3
+slot = 4
+damage = 35.0
+fire_interval = 6.0
+magazine = 0
+projectile_speed = 18.0
+projectile_gravity = 0.0
+projectile_lifetime = 4.0
+splash_radius = 4.0
+splash_damage = 30.0
+recoil_pitch_deg = 2.5
+recoil_yaw_deg = 0.0
+viewmodel_kick = 0.12

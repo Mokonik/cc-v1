@@ -5,9 +5,9 @@ extends InputSource
 
 const REPATH_SECONDS := 0.2
 
-## Returns the other players for a given player id (supplied by Game, which owns who is playing).
-## A callable rather than a Game reference keeps bots independent of the authority layer.
-var get_other_players: Callable
+## Returns the living opponents of a given player id (supplied by Game, which owns who is
+## playing). A callable rather than a Game reference keeps bots independent of the authority layer.
+var get_opponents: Callable
 var profile: BotProfile
 var rng_seed := 0
 
@@ -33,7 +33,7 @@ func set_view(yaw: float, pitch: float) -> void:
 
 func poll(delta: float) -> PlayerCommand:
 	var me := get_parent() as Player
-	if me == null or not get_other_players.is_valid():
+	if me == null or not get_opponents.is_valid():
 		return PlayerCommand.new()
 	if _brain == null:
 		_setup(me)
@@ -74,7 +74,7 @@ func _setup(me: Player) -> void:
 func _pick_target(me: Player) -> Player:
 	var best: Player = null
 	var best_distance := INF
-	for other: Player in get_other_players.call(me.player_id):
+	for other: Player in get_opponents.call(me.player_id):
 		var distance := me.global_position.distance_squared_to(other.global_position)
 		if distance < best_distance:
 			best_distance = distance
