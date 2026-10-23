@@ -1,14 +1,12 @@
 extends CanvasLayer
 ## Crosshair plus a toggleable (F3) readout of the values that matter when tuning movement.
 
-@export var player_path: NodePath
+@export var game: Game
 
-var _player: Player
 var _label: Label
 
 
 func _ready() -> void:
-	_player = get_node(player_path)
 	_build_crosshair()
 	_label = Label.new()
 	_label.position = Vector2(12.0, 8.0)
@@ -25,15 +23,19 @@ func _unhandled_input(event: InputEvent) -> void:
 func _process(_delta: float) -> void:
 	if not _label.visible:
 		return
-	var cfg := _player.config
-	_label.text = "\n".join([
-		"FPS %d" % Engine.get_frames_per_second(),
-		"Speed %.1f m/s  (walk %.1f / sprint %.1f)" % [_player.get_horizontal_speed(), cfg.walk_speed, cfg.sprint_speed],
-		"Vertical %.1f m/s   %s" % [_player.velocity.y, "grounded" if _player.is_on_floor() else "airborne"],
-		"Sensitivity %.4f   ([ / ] to change)" % PlayerSettings.mouse_sensitivity,
-		"",
-		"WASD move  |  Space jump  |  Shift sprint  |  Esc release mouse  |  F3 hide",
-	])
+	var lines: Array[String] = ["FPS %d" % Engine.get_frames_per_second()]
+	var player := game.get_human()
+	if player != null:
+		var cfg := player.config
+		lines.append("Speed %.1f m/s  (walk %.1f / sprint %.1f)" % [player.get_horizontal_speed(), cfg.walk_speed, cfg.sprint_speed])
+		lines.append("Vertical %.1f m/s   %s" % [player.velocity.y, "grounded" if player.is_on_floor() else "airborne"])
+	lines.append("Players: %d human, %d bots" % [
+		game.registry.count_kind(PlayerRegistry.Kind.HUMAN),
+		game.registry.count_kind(PlayerRegistry.Kind.BOT)])
+	lines.append("Sensitivity %.4f   ([ / ] to change)" % PlayerSettings.mouse_sensitivity)
+	lines.append("")
+	lines.append("WASD move  |  Space jump  |  Shift sprint  |  ` console  |  Esc release mouse  |  F3 hide")
+	_label.text = "\n".join(lines)
 
 
 func _build_crosshair() -> void:

@@ -1,25 +1,71 @@
 class_name GrayboxArena
 extends Node3D
-## Procedural gray-box test arena for tuning movement: a run lane with distance
+## Procedural gray-box test arena for tuning movement and bots: a run lane with distance
 ## markers, a jump tower of 1.1 m steps, a ramp, pillars and cover.
-## Geometry is built in code so layout tweaks are one-line diffs.
+## Geometry is built in code so layout tweaks are one-line diffs. All solid geometry lives
+## under a NavigationRegion3D that is baked at startup, so bots can path around it.
 
 const SIZE := 60.0
 const WALL_HEIGHT := 8.0
 
-var spawn_position := Vector3(0.0, 0.1, 22.0)
-var spawn_yaw := 0.0
+class Spawn extends RefCounted:
+	var position := Vector3.ZERO
+	var yaw := 0.0
 
+	func _init(p_position: Vector3, p_yaw: float) -> void:
+		position = p_position
+		yaw = p_yaw
+
+## Four spawns on the arena edges, each facing the center. Index 0 is the human's.
+const SPAWN_POINTS: Array[Vector4] = [
+	Vector4(0.0, 22.0, 0.0, 0.0),
+	Vector4(0.0, -22.0, 0.0, PI),
+	Vector4(-22.0, 0.0, 0.0, -PI / 2.0),
+	Vector4(22.0, 0.0, 0.0, PI / 2.0),
+]
+
+var _geometry: NavigationRegion3D
 var _materials: Dictionary = {}
 var _grid_texture: ImageTexture
 
 
 func _ready() -> void:
+	_geometry = NavigationRegion3D.new()
+	_geometry.name = "Geometry"
+	_geometry.navigation_mesh = _make_navigation_mesh()
+	add_child(_geometry)
+
 	_build_shell()
 	_build_run_lane()
 	_build_jump_tower()
 	_build_ramp()
 	_build_cover()
+	_geometry.bake_navigation_mesh(false)
+
+
+## x and y of each Vector4 are the ground position (x, z); w is the facing yaw.
+func get_spawn(index: int) -> Spawn:
+	var point := SPAWN_POINTS[index % SPAWN_POINTS.size()]
+	return Spawn.new(Vector3(point.x, 0.1, point.y), point.w)
+
+
+func get_navigation_mesh() -> NavigationMesh:
+	return _geometry.navigation_mesh
+
+
+func _make_navigation_mesh() -> NavigationMesh:
+	var mesh := NavigationMesh.new()
+	mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	mesh.geometry_source_geometry_mode = NavigationMesh.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
+	# Voxel sizes match the default navigation map (0.25) so regions merge without warnings.
+	mesh.cell_size = 0.25
+	mesh.cell_height = 0.25
+	mesh.agent_radius = 0.5
+	mesh.agent_height = 2.0
+	# One voxel: bots do not path over ledges the player could not walk up without jumping.
+	mesh.agent_max_climb = 0.25
+	mesh.agent_max_slope = 45.0
+	return mesh
 
 
 func _build_shell() -> void:
@@ -32,9 +78,9 @@ func _build_shell() -> void:
 	_block(Vector3(half + 0.5, WALL_HEIGHT / 2.0, 0.0), Vector3(1.0, WALL_HEIGHT, SIZE), wall_color, "WallE")
 
 
-## Stripes every 5 m from the spawn so speed and distance are readable by eye.
+## Stripes every 5 m from the human spawn so speed and distance are readable by eye.
 func _build_run_lane() -> void:
-	var z := spawn_position.z
+	var z := SPAWN_POINTS[0].y
 	while z > -25.0:
 		var stripe := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
@@ -43,7 +89,7 @@ func _build_run_lane() -> void:
 		stripe.material_override = _material(Color(0.95, 0.8, 0.2))
 		stripe.position = Vector3(0.0, 0.011, z)
 		stripe.name = "Stripe"
-		add_child(stripe)
+		_geometry.add_child(stripe)
 		z -= 5.0
 
 
@@ -92,7 +138,7 @@ func _block(center: Vector3, size: Vector3, color: Color, block_name: String) ->
 	shape.shape = box
 	body.add_child(shape)
 
-	add_child(body)
+	_geometry.add_child(body)
 	return body
 
 

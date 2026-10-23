@@ -2,18 +2,25 @@ class_name Player
 extends CharacterBody3D
 ## First-person character controller.
 ## Tuning lives in MovementConfig; player-facing options (sensitivity, FOV) in PlayerSettings.
-## Movement is split so it can be tested and later driven by the network:
-## _physics_process gathers local input and calls simulate(), which is pure movement.
+## The player is driven by PlayerCommands from an InputSource (keyboard, bot, later network);
+## simulate() is pure movement so it can be tested headless and replayed.
+
+const EYE_HEIGHT := 1.6
 
 signal jumped
 signal landed(impact_speed: float)
 
 @export var config: MovementConfig
-## False for remote puppets and tests: real input is ignored and simulate() is driven externally.
-@export var local_control := true
+## Without an input source the player is a puppet: it only moves when simulate() is called.
+@export var input_source: InputSource
+
+var player_id := 0
+var display_name := ""
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
+@onready var body: MeshInstance3D = $Body
+@onready var visor: MeshInstance3D = $Head/Visor
 
 var _coyote := 0.0
 var _jump_buffer := 0.0
@@ -34,51 +41,31 @@ var _head_rest := Vector3.ZERO
 func _ready() -> void:
 	if config == null:
 		config = MovementConfig.new()
-	InputSetup.ensure_actions()
-	PlayerSettings.ensure_loaded()
 	_head_rest = head.position
 	set_look(rotation.y, 0.0)
 	camera.fov = PlayerSettings.fov
-	if local_control:
+	var local_view := input_source != null and input_source.is_local_view()
+	body.visible = not local_view
+	visor.visible = not local_view
+	if local_view:
 		camera.make_current()
-		if DisplayServer.get_name() != "headless":
-			Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-
-
-func _unhandled_input(event: InputEvent) -> void:
-	if not local_control:
-		return
-	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var sens := PlayerSettings.mouse_sensitivity
-		_look_yaw -= event.relative.x * sens
-		_look_pitch = clampf(_look_pitch - event.relative.y * sens, -config.max_pitch, config.max_pitch)
-	elif event.is_action_pressed("ui_cancel"):
-		var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if captured else Input.MOUSE_MODE_CAPTURED
-	elif event is InputEventMouseButton and event.pressed and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
-	elif event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_BRACKETLEFT:
-			PlayerSettings.scale_sensitivity(1.0 / 1.1)
-		elif event.keycode == KEY_BRACKETRIGHT:
-			PlayerSettings.scale_sensitivity(1.1)
 
 
 func _physics_process(delta: float) -> void:
-	if not local_control:
+	if input_source == null:
 		return
-	var move := Input.get_vector(&"move_left", &"move_right", &"move_forward", &"move_back")
-	simulate(
-		move,
-		Input.is_action_just_pressed(&"jump"),
-		Input.is_action_pressed(&"jump"),
-		Input.is_action_pressed(&"sprint"),
-		delta)
+	apply_command(input_source.poll(delta), delta)
 
 
 func _process(delta: float) -> void:
 	_update_look(delta)
 	_update_camera(delta)
+
+
+func apply_command(command: PlayerCommand, delta: float) -> void:
+	_look_yaw = command.yaw
+	_look_pitch = clampf(command.pitch, -config.max_pitch, config.max_pitch)
+	simulate(command.move, command.jump_pressed, command.jump_held, command.sprint, delta)
 
 
 ## Sets view direction immediately (spawning, teleports, tests).
@@ -89,13 +76,24 @@ func set_look(yaw: float, pitch: float) -> void:
 	_pitch = _look_pitch
 	rotation.y = _yaw
 	head.rotation.x = _pitch
+	if input_source != null:
+		input_source.set_view(_look_yaw, _look_pitch)
+
+
+func set_body_color(color: Color) -> void:
+	var body_material := StandardMaterial3D.new()
+	body_material.albedo_color = color
+	body.material_override = body_material
+	var visor_material := StandardMaterial3D.new()
+	visor_material.albedo_color = Color(0.08, 0.1, 0.12)
+	visor.material_override = visor_material
 
 
 func get_horizontal_speed() -> float:
 	return Vector2(velocity.x, velocity.z).length()
 
 
-## Advances movement by one physics step. move.y < 0 is forward, matching Input.get_vector.
+## Advances movement by one physics step. move.y < 0 is forward, matching PlayerCommand.move.
 func simulate(move: Vector2, jump_pressed: bool, jump_held: bool, sprint: bool, delta: float) -> void:
 	move = move.limit_length(1.0)
 	var on_floor := is_on_floor()

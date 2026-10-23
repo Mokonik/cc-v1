@@ -2,8 +2,6 @@
 # Run with: pvpve/tools/godot.sh --headless --script res://tests/test_movement.gd
 extends SceneTree
 
-const PlayerScene := preload("res://player/player.tscn")
-
 var _failures := 0
 var _spawned: Array[Node] = []
 var _dt := 1.0 / 60.0
@@ -32,6 +30,7 @@ func _run_all() -> void:
 	_test_settings_roundtrip()
 	await _test_arena_builds()
 	await _test_main_scene()
+	_clear()
 	print("movement tests: %d failure(s)" % _failures)
 	quit(1 if _failures > 0 else 0)
 
@@ -75,8 +74,8 @@ func _new_world(floor_size: Vector3 = Vector3(80, 1, 80)) -> void:
 
 
 func _new_player(position: Vector3) -> Player:
-	var player: Player = PlayerScene.instantiate()
-	player.local_control = false
+	# Loaded on demand: a PackedScene held by this script would be reported as leaked at exit.
+	var player: Player = load("res://player/player.tscn").instantiate()
 	root.add_child(player)
 	player.global_position = position
 	_spawned.append(player)
@@ -300,21 +299,27 @@ func _test_arena_builds() -> void:
 	root.add_child(arena)
 	_spawned.append(arena)
 	await process_frame
-	var bodies := arena.get_children().filter(func(c: Node) -> bool: return c is StaticBody3D)
+	var bodies := arena.find_children("*", "StaticBody3D", true, false)
 	_check(bodies.size() >= 20, "arena has colliders (%d)" % bodies.size())
-	_check(arena.spawn_position.y >= 0.0, "spawn point is above the floor")
+	_check(arena.get_spawn(0).position.y >= 0.0, "spawn point is above the floor")
+	_check(arena.get_navigation_mesh().get_polygon_count() > 0, "navigation mesh baked (%d polygons)" % arena.get_navigation_mesh().get_polygon_count())
 
 
 func _test_main_scene() -> void:
 	print("main scene")
 	_clear()
 	var main: Node = load("res://world/main.tscn").instantiate()
+	main.start_bots = 0
 	root.add_child(main)
 	_spawned.append(main)
 	for i in 120:
 		await physics_frame
-	var player: Player = main.get_node("Player")
+	var game: Game = main.get_node("Game")
 	var arena: GrayboxArena = main.get_node("Arena")
+	var player := game.get_human()
+	_check(player != null and player.player_id == PlayerRegistry.HOST_ID, "human spawns with the host id")
 	_check(player.is_on_floor(), "player spawns and lands on the arena floor")
-	_check(player.global_position.distance_to(Vector3(arena.spawn_position.x, 0, arena.spawn_position.z)) < 0.2, "player is at the arena spawn")
+	var spawn := arena.get_spawn(0)
+	_check(player.global_position.distance_to(Vector3(spawn.position.x, 0, spawn.position.z)) < 0.2, "player is at the arena spawn")
 	_check(player.camera.current, "local player's camera is current")
+	_check(not player.body.visible, "local player's own body is hidden")
