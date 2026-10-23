@@ -35,7 +35,7 @@ func _process(_delta: float) -> void:
 		game.registry.count_kind(PlayerRegistry.Kind.DUMMY)])
 	lines.append("Sensitivity %.4f   ([ / ] to change)" % PlayerSettings.mouse_sensitivity)
 	lines.append("")
-	lines.append("WASD move | Space jump | Shift sprint | LMB fire | R reload | 1-4 / wheel weapon | ` console | Esc mouse | F3 hide")
+	lines.append("WASD move | Space jump | Shift sprint | LMB fire | R reload | 1-4 weapon | F health | G trap | Z X C perk | ` console | F3 hide")
 	_label.text = "\n".join(lines)
 
 

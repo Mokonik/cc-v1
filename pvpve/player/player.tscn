@@ -16,7 +16,7 @@ size = Vector3(0.36, 0.12, 0.2)
 
 [node name="Player" type="CharacterBody3D"]
 collision_layer = 2
-collision_mask = 3
+collision_mask = 7
 floor_snap_length = 0.3
 script = ExtResource("1_player")
 config = ExtResource("2_cfg")

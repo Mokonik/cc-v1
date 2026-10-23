@@ -18,6 +18,8 @@ const DUMMY_COLOR := Color(0.92, 0.55, 0.22)
 
 @export var arena: GrayboxArena
 @export var players_root: Node3D
+@export var monsters_root: Node3D
+@export var zones_root: Node3D
 
 var seed_value := 1
 var rng := RandomNumberGenerator.new()
@@ -25,6 +27,15 @@ var registry := PlayerRegistry.new()
 var events := EventBus.new()
 var weapons := WeaponCatalog.new()
 var combat := CombatSystem.new()
+var monster_defs := MonsterCatalog.new()
+var monsters := MonsterSystem.new()
+var zones := ZoneManager.new()
+var pve := PveDirector.new()
+var progression := Progression.new()
+var perk_defs := PerkCatalog.new()
+var loot := LootSystem.new()
+## Default difficulty for new PvE phases (1.0 = base). M5 raises it for the score leader.
+var pve_difficulty := 1.0
 var tick := 0
 
 ## Where dummies reappear after dying (player id -> GrayboxArena.Spawn).
@@ -32,19 +43,35 @@ var _homes: Dictionary = {}
 
 
 func _ready() -> void:
-	combat.setup(events, weapons, get_player, _space_state, _spawn_for)
+	combat.setup(events, weapons, get_body, _space_state, _spawn_for)
+	monsters.setup(events, combat, monster_defs, monsters_root, get_opponents.bind(0), get_player)
+	zones.setup(zones_root)
+	pve.setup(events, combat, monsters, zones, monster_defs, get_player, load("res://content/pve_config.tres"))
+	progression.setup(events, combat, perk_defs)
+	loot.setup(events, combat, progression, monster_defs, get_body, load("res://content/loot/default_loot.tres"))
+	events.monster_killed.connect(_on_monster_killed)
+	events.player_died.connect(_on_player_died)
+	events.loot_picked_up.connect(_on_loot_picked_up)
 	set_seed(seed_value)
 
 
 func _physics_process(_delta: float) -> void:
 	tick += 1
 	combat.step(tick)
+	_process_player_actions()
+	monsters.step(tick)
+	pve.step(tick)
+	loot.step(tick)
 
 
 func set_seed(value: int) -> void:
 	seed_value = value
 	rng.seed = value
 	combat.seed_value = value
+	monsters.set_seed(value)
+	pve.set_seed(value)
+	progression.set_seed(value)
+	loot.set_seed(value)
 
 
 ## Spawns a human or a bot. Returns null when the match is full.
@@ -73,6 +100,8 @@ func spawn_player(kind: int, profile: BotProfile = null) -> Player:
 	player.set_body_color(BODY_COLORS[(record.id - 1) % BODY_COLORS.size()])
 	# Bots only move in M3: they are targets, and do not fire back yet.
 	combat.register(record.id, kind == PlayerRegistry.Kind.HUMAN)
+	progression.register(record.id)
+	loot.register(record.id)
 	events.player_spawned.emit(record.id)
 	return player
 
@@ -100,8 +129,12 @@ func remove_player(id: int) -> void:
 	var record := registry.get_record(id)
 	if record == null:
 		return
+	pve.stop_run(id)
+	zones.free_zone(id)
 	registry.remove(id)
 	combat.unregister(id)
+	progression.unregister(id)
+	loot.unregister(id)
 	_homes.erase(id)
 	if is_instance_valid(record.player):
 		record.player.queue_free()
@@ -116,11 +149,22 @@ func clear_dummies() -> int:
 	return _clear_kind(PlayerRegistry.Kind.DUMMY)
 
 
+func clear_monsters() -> int:
+	return monsters.clear_all()
+
+
 func get_player(id: int) -> Player:
 	var record := registry.get_record(id)
 	if record != null and is_instance_valid(record.player):
 		return record.player
 	return null
+
+
+## Any combatant by entity id: a player, and (later) a monster.
+func get_body(id: int) -> Combatant:
+	if id >= MonsterSystem.FIRST_ID:
+		return monsters.get_body(id)
+	return get_player(id)
 
 
 func get_human() -> Player:
@@ -178,6 +222,8 @@ func _space_state() -> PhysicsDirectSpaceState3D:
 func _spawn_for(id: int) -> GrayboxArena.Spawn:
 	if _homes.has(id):
 		return _homes[id]
+	if zones.is_inside(id):
+		return zones.get_zone(id).player_start()
 	var best_index := 0
 	var best_distance := -1.0
 	for i in GrayboxArena.SPAWN_POINTS.size():
@@ -190,3 +236,64 @@ func _spawn_for(id: int) -> GrayboxArena.Spawn:
 			best_distance = nearest
 			best_index = i
 	return arena.get_spawn(best_index)
+
+
+## Rewards for a monster kill: XP, Sabotage Points and a seeded loot roll, all to the killer.
+## Runs a bot's PvE phase through the stat model instead of a real zone, then gives the bot the
+## results exactly as a human would earn them: XP (and so level-ups and perks), Sabotage Points
+## and a recorded result. level selects the skill (0 rookie, 1 regular, 2 veteran).
+func run_bot_pve(bot_id: int, level := 1, effects: BotPveModel.Effects = null) -> PveResult:
+	var record := registry.get_record(bot_id)
+	if record == null or record.kind != PlayerRegistry.Kind.BOT:
+		return null
+	var config: PveConfig = pve.base_config().duplicate()
+	config.difficulty = pve_difficulty
+	var result := BotPveModel.simulate(BotPveModel.skill_for_level(level), config, monster_defs, seed_value, bot_id, effects)
+	progression.grant_xp(bot_id, result.xp)
+	progression.grant_sabotage_points(bot_id, result.sabotage_points)
+	var state := progression.get_state(bot_id)
+	while state.has_pending_offer():
+		progression.pick_perk(bot_id, BotPerkPicker.choose(state.offers[0]))
+	pve.last_results[bot_id] = result
+	return result
+
+
+func _on_monster_killed(monster_id: int, killer_id: int, position: Vector3, def_id: StringName) -> void:
+	var record := monsters.get_record(monster_id)
+	var def := monster_defs.get_def(def_id)
+	if record != null and def != null:
+		var xp := 0
+		var points := 0
+		if progression.get_state(killer_id) != null:
+			var killer_stats := combat.get_vitals(killer_id).stats
+			xp = def.xp
+			points = def.sabotage_points + killer_stats.sabotage_point_bonus
+			progression.grant_xp(killer_id, xp)
+			progression.grant_sabotage_points(killer_id, points)
+		loot.roll_drop(monster_id, def, killer_id, record.owner_id, position + Vector3(0.0, 0.4, 0.0), record.wave)
+		pve.record_kill(record.owner_id, def_id, monster_id, xp, points)
+	monsters.mark_dead(monster_id)
+
+
+func _on_loot_picked_up(player_id: int, _drop_id: int, _kind: int, label: String) -> void:
+	pve.record_loot(player_id, label)
+
+
+## Item, trap and perk-choice commands from each player's last command. One-shot flags, so
+## each applies once per tick.
+func _process_player_actions() -> void:
+	for id in registry.ids():
+		var player := get_player(id)
+		if player == null or not combat.is_alive(id) or not combat.get_vitals(id).accepts_commands:
+			continue
+		var command := player.last_command
+		if command.use_item:
+			loot.use_health_pack(id)
+		if command.place_trap:
+			loot.place_trap(id)
+		if command.perk_pick != 0:
+			progression.pick_perk(id, command.perk_pick)
+
+
+func _on_player_died(victim_id: int, _killer_id: int, _weapon_id: StringName) -> void:
+	pve.record_death(victim_id)

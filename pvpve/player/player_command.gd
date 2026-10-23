@@ -20,3 +20,9 @@ var reload_pressed := false
 var weapon_slot := 0
 ## +1 / -1 cycles to the next / previous owned weapon; 0 means no change.
 var weapon_cycle := 0
+## Use a health pack.
+var use_item := false
+## Place a trap at your feet.
+var place_trap := false
+## 1-3 picks that perk from your oldest pending level-up offer; 0 means no pick.
+var perk_pick := 0

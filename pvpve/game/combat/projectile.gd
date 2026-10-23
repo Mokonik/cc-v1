@@ -11,3 +11,9 @@ var velocity := Vector3.ZERO
 var spawn_tick := 0
 ## Draw strength (0-1). Scales an arrow's damage and speed; always 1 for abilities.
 var power := 1.0
+## Resolved at launch so later tier or perk changes never alter a shot already in flight.
+var damage := 0.0
+var splash_radius := 0.0
+var splash_damage := 0.0
+## Physics mask this projectile collides with (see CombatLayers).
+var mask := CombatLayers.PLAYER_SHOTS

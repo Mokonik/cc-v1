@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PerkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/perk_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"marksman"
+display_name = "Marksman"
+description = "+8% damage with the pistol, bow and orb."
+max_stacks = 4
+gun_damage_bonus = 0.08
+bow_damage_bonus = 0.08
+orb_damage_bonus = 0.08

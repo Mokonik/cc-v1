@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="MonsterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/monster_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"grunt"
+display_name = &"Grunt"
+radius = 0.4
+height = 1.6
+color = Color(0.55, 0.7, 0.35, 1)
+max_hp = 60.0
+move_speed = 4.2
+melee_damage = 10.0
+melee_range = 1.9
+melee_windup = 0.35
+melee_interval = 1.1
+score_value = 10
+xp = 20
+sabotage_points = 1
+loot_chance = 0.22

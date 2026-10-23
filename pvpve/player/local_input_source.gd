@@ -47,6 +47,11 @@ func poll(_delta: float) -> PlayerCommand:
 	for slot in range(1, 5):
 		if Input.is_action_just_pressed(StringName("slot_%d" % slot)):
 			command.weapon_slot = slot
+	command.use_item = Input.is_action_just_pressed(&"use_item")
+	command.place_trap = Input.is_action_just_pressed(&"place_trap")
+	for pick in range(1, 4):
+		if Input.is_action_just_pressed(StringName("perk_%d" % pick)):
+			command.perk_pick = pick
 	if Input.is_action_just_pressed(&"weapon_next"):
 		command.weapon_cycle = 1
 	elif Input.is_action_just_pressed(&"weapon_prev"):

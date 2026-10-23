@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://world/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://world/graybox_arena.gd" id="2_arena"]
@@ -8,6 +8,8 @@
 [ext_resource type="Script" path="res://fx/combat_view.gd" id="6_view"]
 [ext_resource type="Script" path="res://fx/combat_sfx.gd" id="7_sfx"]
 [ext_resource type="Script" path="res://ui/combat_hud.gd" id="8_hud"]
+[ext_resource type="Script" path="res://fx/pve_view.gd" id="9_pve"]
+[ext_resource type="Script" path="res://ui/pve_hud.gd" id="10_pvehud"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky"]
 
@@ -37,13 +39,23 @@ script = ExtResource("2_arena")
 
 [node name="Players" type="Node3D" parent="."]
 
-[node name="Game" type="Node" parent="." node_paths=PackedStringArray("arena", "players_root")]
+[node name="Monsters" type="Node3D" parent="."]
+
+[node name="Zones" type="Node3D" parent="."]
+
+[node name="Game" type="Node" parent="." node_paths=PackedStringArray("arena", "players_root", "monsters_root", "zones_root")]
 script = ExtResource("3_game")
 arena = NodePath("../Arena")
 players_root = NodePath("../Players")
+monsters_root = NodePath("../Monsters")
+zones_root = NodePath("../Zones")
 
 [node name="CombatView" type="Node3D" parent="." node_paths=PackedStringArray("game")]
 script = ExtResource("6_view")
+game = NodePath("../Game")
+
+[node name="PveView" type="Node3D" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("9_pve")
 game = NodePath("../Game")
 
 [node name="CombatSfx" type="Node3D" parent="." node_paths=PackedStringArray("game")]
@@ -52,6 +64,10 @@ game = NodePath("../Game")
 
 [node name="CombatHud" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
 script = ExtResource("8_hud")
+game = NodePath("../Game")
+
+[node name="PveHud" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]
+script = ExtResource("10_pvehud")
 game = NodePath("../Game")
 
 [node name="HUD" type="CanvasLayer" parent="." node_paths=PackedStringArray("game")]

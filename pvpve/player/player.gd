@@ -1,5 +1,5 @@
 class_name Player
-extends CharacterBody3D
+extends Combatant
 ## First-person character controller.
 ## Tuning lives in MovementConfig; player-facing options (sensitivity, FOV) in PlayerSettings.
 ## The player is driven by PlayerCommands from an InputSource (keyboard, bot, later network);
@@ -15,10 +15,15 @@ signal landed(impact_speed: float)
 ## Without an input source the player is a puppet: it only moves when simulate() is called.
 @export var input_source: InputSource
 
-var player_id := 0
-var display_name := ""
-var alive := true
+## Alias for entity_id; players are ids 1-4.
+var player_id: int:
+	get:
+		return entity_id
+	set(value):
+		entity_id = value
 var protected := false
+## Perks and status effects scale walking speed through this (1.0 = unchanged).
+var speed_scale := 1.0
 ## The most recent command this player applied; CombatSystem reads it each tick.
 var last_command := PlayerCommand.new()
 
@@ -153,6 +158,13 @@ func respawn_at(position: Vector3, yaw: float) -> void:
 	set_alive(true)
 
 
+## Moves the player instantly (zone changes, console teleport) without touching life state.
+func teleport_to(position: Vector3, yaw: float) -> void:
+	global_position = position
+	velocity = Vector3.ZERO
+	set_look(yaw, 0.0)
+
+
 ## Camera kick in radians. Purely visual: it never changes where shots go.
 func add_recoil(pitch: float, yaw: float) -> void:
 	_recoil += Vector2(pitch, yaw)
@@ -195,7 +207,7 @@ func simulate(move: Vector2, jump_pressed: bool, jump_held: bool, sprint: bool, 
 		_jump_active = false
 
 	var wish_dir := (global_transform.basis * Vector3(move.x, 0.0, move.y)).normalized()
-	var top_speed := config.sprint_speed if (sprint and move.y < -0.1) else config.walk_speed
+	var top_speed := (config.sprint_speed if (sprint and move.y < -0.1) else config.walk_speed) * speed_scale
 	var wish_speed := top_speed * move.length()
 	var horizontal := Vector3(velocity.x, 0.0, velocity.z)
 	if on_floor and velocity.y <= 0.0:

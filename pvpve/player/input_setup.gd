@@ -16,6 +16,11 @@ const ACTIONS := {
 	&"slot_3": [KEY_3],
 	&"slot_4": [KEY_4],
 	&"weapon_next": [KEY_Q],
+	&"use_item": [KEY_F],
+	&"place_trap": [KEY_G],
+	&"perk_1": [KEY_Z],
+	&"perk_2": [KEY_X],
+	&"perk_3": [KEY_C],
 }
 const MOUSE_ACTIONS := {
 	&"fire": [MOUSE_BUTTON_LEFT],

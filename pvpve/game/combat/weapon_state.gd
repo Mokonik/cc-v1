@@ -3,6 +3,8 @@ extends RefCounted
 ## One player's runtime state for one weapon. Times are absolute tick numbers; -1 means "not happening".
 
 var def: WeaponDef
+## 1-3. Higher tiers hit harder and fire faster; see WeaponDef.damage_at / interval_at.
+var tier := 1
 var ammo := 0
 var next_fire_tick := 0
 var reload_done_tick := -1

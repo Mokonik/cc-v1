@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MonsterDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/monster_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"brute"
+display_name = &"Brute"
+radius = 0.65
+height = 2.2
+color = Color(0.8, 0.4, 0.3, 1)
+max_hp = 160.0
+move_speed = 2.8
+melee_damage = 0.0
+slam_damage = 30.0
+slam_radius = 2.8
+slam_windup = 0.7
+slam_cooldown = 2.4
+charge_damage = 25.0
+charge_windup = 0.8
+charge_speed = 14.0
+charge_time = 1.2
+charge_cooldown = 6.0
+stun_time = 1.5
+score_value = 40
+xp = 70
+sabotage_points = 2
+loot_chance = 0.5

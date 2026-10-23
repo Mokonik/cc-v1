@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="WeaponDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/combat/weapon_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"spit"
+display_name = &"Spit"
+kind = 2
+damage = 12.0
+fire_interval = 1.8
+projectile_speed = 20.0
+projectile_gravity = 4.0
+projectile_lifetime = 3.0
+magazine = 0

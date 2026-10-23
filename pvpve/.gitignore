@@ -1,5 +1,6 @@
-.godot/
 *.translation
+.godot/
 export/
+pshots*/
 shot_*.png
 shots*/

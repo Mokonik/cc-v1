@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="PerkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/perk_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"swiftness"
+display_name = "Swiftness"
+description = "+6% movement speed."
+max_stacks = 4
+speed_bonus = 0.06

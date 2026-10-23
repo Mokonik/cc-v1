@@ -16,7 +16,8 @@ fi
 
 failed=0
 for name in "${tests[@]}"; do
-	output=$(timeout 300 "$GODOT" --headless --script "res://tests/$name" 2>&1)
+	# --fixed-fps turns off real-time pacing: game logic is tick-based, so results are identical, only faster.
+	output=$(timeout 600 "$GODOT" --headless --fixed-fps 60 --script "res://tests/$name" 2>&1)
 	code=$?
 	if [ "$code" -ne 0 ] || grep -qE 'SCRIPT ERROR|Parse Error|^ERROR:' <<<"$output"; then
 		failed=1

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PerkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/perk_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"quick_hands"
+display_name = "Quick Hands"
+description = "12% faster reloads and bow draws."
+max_stacks = 3
+reload_time_reduction = 0.12
+draw_time_reduction = 0.12

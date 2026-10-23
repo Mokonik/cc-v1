@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="MonsterDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/pve/monster_def.gd" id="1_def"]
+[ext_resource type="Resource" path="res://content/monsters/spit.tres" id="2_spit"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"spitter"
+display_name = &"Spitter"
+radius = 0.35
+height = 1.5
+color = Color(0.65, 0.4, 0.8, 1)
+max_hp = 40.0
+move_speed = 3.6
+melee_damage = 0.0
+spit_count = 1
+spit_spread_deg = 0.0
+spit_range = 24.0
+spit_windup = 0.5
+spit_interval = 1.8
+keep_distance = 14.0
+score_value = 18
+xp = 30
+sabotage_points = 1
+loot_chance = 0.3
+spit = ExtResource("2_spit")

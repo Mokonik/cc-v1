@@ -17,6 +17,14 @@ var deaths := 0
 var god := false
 ## False for players whose commands should not trigger combat yet (bots and dummies in M3).
 var accepts_commands := true
+## Monsters never respawn and report deaths as monster_killed.
+var is_monster := false
+var monster_def_id: StringName = &""
+## Perk and modifier effects on this entity.
+var stats := PlayerStats.new()
+## Movement slow (status effect): factor applies until this tick.
+var slow_until_tick := 0
+var slow_factor := 1.0
 ## slot (1-4) -> WeaponState
 var weapons: Dictionary = {}
 var current_slot := 0

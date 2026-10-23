@@ -105,6 +105,39 @@ def main():
         decay(sweep(440, 440, 0.12), 3.0),
         delay(decay(sweep(660, 660, 0.12), 3.0), 0.09),
         delay(decay(sweep(880, 880, 0.2), 3.5), 0.18)))
+    write("monster_hit", mix(
+        decay(sweep(260, 150, 0.11), 6.0),
+        gain(decay(lowpass(noise(rng, n(0.11)), 0.35), 8.0), 0.7)))
+    write("monster_die", mix(
+        decay(sweep(240, 55, 0.55), 3.0),
+        gain(decay(lowpass(noise(rng, n(0.55)), 0.15), 4.5), 0.6)))
+    write("spit", mix(
+        decay(sweep(500, 140, 0.2), 6.0),
+        gain(decay(lowpass(noise(rng, n(0.2)), 0.5), 9.0), 0.8)))
+    write("slam", mix(
+        decay(sweep(110, 40, 0.5), 5.0),
+        gain(decay(lowpass(noise(rng, n(0.45)), 0.1), 6.0), 1.0)))
+    charge = sweep(90, 170, 0.5, 1.4)
+    write("charge", [x * (0.4 + 0.6 * i / len(charge)) for i, x in enumerate(charge)])
+    roar_base = mix(sweep(70, 50, 1.1), gain(lowpass(noise(rng, n(1.1)), 0.08), 1.4), gain(sweep(140, 95, 1.1), 0.5))
+    write("roar", [x * math.sin(math.pi * min(1.0, i / len(roar_base))) for i, x in enumerate(roar_base)])
+    write("pickup", mix(
+        decay(sweep(700, 700, 0.07), 3.0),
+        delay(decay(sweep(1000, 1000, 0.1), 4.0), 0.06)))
+    write("levelup", mix(
+        decay(sweep(523, 523, 0.14), 3.0),
+        delay(decay(sweep(659, 659, 0.14), 3.0), 0.1),
+        delay(decay(sweep(784, 784, 0.14), 3.0), 0.2),
+        delay(decay(sweep(1047, 1047, 0.3), 3.5), 0.3)))
+    write("trap_arm", mix(
+        decay(sweep(900, 900, 0.04), 4.0),
+        delay(decay(sweep(1200, 1200, 0.05), 5.0), 0.07)))
+    write("trap_boom", mix(
+        decay(lowpass(noise(rng, n(0.35)), 0.3), 5.0),
+        gain(decay(sweep(180, 70, 0.3), 5.0), 0.9)))
+    write("heal", mix(
+        decay(sweep(400, 900, 0.35, 1.2), 2.5),
+        gain(decay(sweep(800, 1800, 0.35, 1.2), 3.5), 0.4)))
     write("draw", mix(
         gain(decay(lowpass(noise(rng, n(0.45)), 0.05), 2.0), 0.7),
         gain(sweep(80, 130, 0.45), 0.15)))

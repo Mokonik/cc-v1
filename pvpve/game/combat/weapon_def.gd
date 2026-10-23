@@ -50,8 +50,27 @@ enum Kind { HITSCAN, MELEE, PROJECTILE, ABILITY }
 @export_range(0.0, 0.5, 0.01) var viewmodel_kick := 0.06
 
 
+const MAX_TIER := 3
+## Each tier above 1 adds this fraction of the base damage...
+const TIER_DAMAGE_BONUS := 0.25
+## ...and shortens the interval between uses by this fraction.
+const TIER_RATE_BONUS := 0.10
+
+
 static func seconds_to_ticks(seconds: float) -> int:
 	return roundi(seconds * Engine.physics_ticks_per_second)
+
+
+func damage_at(tier: int) -> float:
+	return damage * (1.0 + TIER_DAMAGE_BONUS * (clampi(tier, 1, MAX_TIER) - 1))
+
+
+func splash_damage_at(tier: int) -> float:
+	return splash_damage * (1.0 + TIER_DAMAGE_BONUS * (clampi(tier, 1, MAX_TIER) - 1))
+
+
+func interval_at(tier: int) -> float:
+	return fire_interval * (1.0 - TIER_RATE_BONUS * (clampi(tier, 1, MAX_TIER) - 1))
 
 
 func uses_ammo() -> bool:

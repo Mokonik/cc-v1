@@ -1,0 +1,64 @@
+[gd_resource type="Resource" script_class="LootTable" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://game/pve/loot_table.gd" id="1_table"]
+[ext_resource type="Script" path="res://game/pve/loot_entry.gd" id="2_entry"]
+
+[sub_resource type="Resource" id="Resource_0"]
+script = ExtResource("2_entry")
+kind = 1
+id = &""
+weight = 30.0
+min_wave = 1
+amount = 35
+
+[sub_resource type="Resource" id="Resource_1"]
+script = ExtResource("2_entry")
+kind = 2
+id = &""
+weight = 18.0
+min_wave = 1
+amount = 0
+
+[sub_resource type="Resource" id="Resource_2"]
+script = ExtResource("2_entry")
+kind = 3
+id = &""
+weight = 22.0
+min_wave = 1
+amount = 25
+
+[sub_resource type="Resource" id="Resource_3"]
+script = ExtResource("2_entry")
+kind = 0
+id = &"sword"
+weight = 10.0
+min_wave = 1
+amount = 0
+
+[sub_resource type="Resource" id="Resource_4"]
+script = ExtResource("2_entry")
+kind = 0
+id = &"bow"
+weight = 10.0
+min_wave = 1
+amount = 0
+
+[sub_resource type="Resource" id="Resource_5"]
+script = ExtResource("2_entry")
+kind = 0
+id = &"orb"
+weight = 8.0
+min_wave = 2
+amount = 0
+
+[sub_resource type="Resource" id="Resource_6"]
+script = ExtResource("2_entry")
+kind = 0
+id = &"pistol"
+weight = 10.0
+min_wave = 2
+amount = 0
+
+[resource]
+script = ExtResource("1_table")
+entries = [SubResource("Resource_0"), SubResource("Resource_1"), SubResource("Resource_2"), SubResource("Resource_3"), SubResource("Resource_4"), SubResource("Resource_5"), SubResource("Resource_6")]

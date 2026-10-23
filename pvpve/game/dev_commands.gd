@@ -17,6 +17,17 @@ const HELP := """Commands:
   damage <id> <n>       hurt a player, bot or dummy (credited to you)
   dummy [stand|strafe]  spawn a target dummy in front of you (max 6)
   dummy clear           remove all dummies
+  monster <id> [n]      spawn monsters ahead of you: grunt, spitter, brute, warden (max 12)
+  monster clear         remove all monsters
+  pve start [seconds]   enter your PvE zone and start a phase (default 240 s)
+  pve stop | skip | status   end it, jump to the boss, or show progress
+  difficulty [x]        PvE difficulty for new phases (0.25-4, default 1)
+  loot <sword|bow|orb|pistol|health|trap|xp>   drop that pickup at your feet
+  xp <n>                give yourself XP (levels up and offers perks: keys Z X C)
+  perk list | give <id> list perks, or give yourself a stack of one
+  sp <n>                give yourself Sabotage Points
+  heal                  restore your health
+  botpve [0-2] [bot id] simulate a bot's PvE phase with the stat model and show the result
   respawn               bring yourself back from the dead right now
   ttk                   ideal time to kill (100 hp) for each weapon
   tp <x> <z>            teleport yourself
@@ -53,6 +64,24 @@ static func run(line: String, game: Game) -> String:
 			return _damage(args, game)
 		"dummy":
 			return _dummy(args, game)
+		"monster":
+			return _monster(args, game)
+		"pve":
+			return _pve(args, game)
+		"difficulty":
+			return _difficulty(args, game)
+		"loot":
+			return _loot(args, game)
+		"xp":
+			return _xp(args, game)
+		"perk":
+			return _perk(args, game)
+		"sp":
+			return _sp(args, game)
+		"heal":
+			return _heal(game)
+		"botpve":
+			return _botpve(args, game)
 		"respawn":
 			return _respawn(game)
 		"ttk":
@@ -264,3 +293,169 @@ static func _ttk(game: Game) -> String:
 	for def in game.weapons.all():
 		lines.append("  %-9s %5.1f dmg  %5.2f s ideal TTK from 100 hp" % [def.display_name, def.damage, def.ttk(Vitals.MAX_HP)])
 	return "\n".join(lines)
+
+
+static func _monster(args: PackedStringArray, game: Game) -> String:
+	if args.is_empty():
+		return "Usage: monster <%s> [n] | monster clear" % "|".join(game.monster_defs.ids())
+	if args[0].to_lower() == "clear":
+		return "Removed %d monster(s)." % game.clear_monsters()
+	var id := StringName(args[0].to_lower())
+	if not game.monster_defs.has(id):
+		return "Unknown monster '%s'. Try %s." % [args[0], ", ".join(game.monster_defs.ids())]
+	var human := game.get_human()
+	if human == null:
+		return "No local player."
+	var count := 1
+	if args.size() > 1:
+		if not args[1].is_valid_int():
+			return "Usage: monster <id> [n]"
+		count = clampi(args[1].to_int(), 1, 12)
+	var forward := Player.direction_from(human.rotation.y, 0.0)
+	var right := Vector3(-forward.z, 0.0, forward.x)
+	var half := GrayboxArena.SIZE / 2.0 - 2.0
+	var spawned := 0
+	for i in count:
+		var spot := human.global_position + forward * (12.0 + 2.5 * (i / 5)) + right * (((i % 5) - 2) * 2.5)
+		spot.x = clampf(spot.x, -half, half)
+		spot.z = clampf(spot.z, -half, half)
+		if game.monsters.spawn(id, Vector3(spot.x, 0.1, spot.z)) != 0:
+			spawned += 1
+	return "Spawned %d %s." % [spawned, game.monster_defs.get_def(id).display_name]
+
+
+static func _pve(args: PackedStringArray, game: Game) -> String:
+	if game.get_human() == null:
+		return "No local player."
+	var id := PlayerRegistry.HOST_ID
+	var sub := args[0].to_lower() if not args.is_empty() else "status"
+	match sub:
+		"start":
+			var seconds := -1.0
+			if args.size() > 1:
+				if not args[1].is_valid_float() or args[1].to_float() <= 0.0:
+					return "Usage: pve start [seconds]"
+				seconds = args[1].to_float()
+			var error := game.pve.start_run(id, seconds, game.pve_difficulty)
+			if error != "":
+				return error
+			var run := game.pve.get_run(id)
+			return "PvE phase started: %.0f s of waves, then the boss (difficulty %.2f)." % [run.config.phase_seconds, run.config.difficulty]
+		"stop":
+			return "Phase ended." if game.pve.stop_run(id) else "You are not in a PvE phase."
+		"skip":
+			return "Boss incoming." if game.pve.skip_to_boss(id) else "Nothing to skip."
+		"status":
+			var run := game.pve.get_run(id)
+			if run == null:
+				var last: PveResult = game.pve.last_results.get(id)
+				if last == null:
+					return "Not in a PvE phase. Use pve start."
+				return "Last phase: %s, %d kills, score %d." % [last.reason, last.kill_count(), last.score]
+			return "%s, %.0f s left, wave %d, %d monsters alive, %d kills, %d deaths." % [
+				String(game.pve.phase_name(run)), game.pve.seconds_left(id), run.waves_started,
+				game.monsters.count_owned_by(id), run.result.kill_count(), run.result.deaths]
+	return "Usage: pve start [seconds] | stop | skip | status"
+
+
+static func _difficulty(args: PackedStringArray, game: Game) -> String:
+	if args.is_empty():
+		return "Difficulty %.2f. Usage: difficulty <0.25-4>" % game.pve_difficulty
+	if not args[0].is_valid_float():
+		return "Usage: difficulty <0.25-4>"
+	game.pve_difficulty = clampf(args[0].to_float(), 0.25, 4.0)
+	return "Difficulty %.2f for new PvE phases." % game.pve_difficulty
+
+
+static func _loot(args: PackedStringArray, game: Game) -> String:
+	var human := game.get_human()
+	if human == null:
+		return "No local player."
+	if args.is_empty():
+		return "Usage: loot <sword|bow|orb|pistol|health|trap|xp>"
+	var kind := StringName(args[0].to_lower())
+	if kind == &"fire_orb":
+		kind = &"orb"
+	if not (game.weapons.has(kind) or kind in [&"health", &"trap", &"xp"]):
+		return "Unknown loot '%s'. Try sword, bow, orb, pistol, health, trap or xp." % args[0]
+	var forward := Player.direction_from(human.rotation.y, 0.0)
+	var drop := game.loot.spawn_named(kind, human.global_position + forward * 1.0 + Vector3(0.0, 0.5, 0.0), 0)
+	return "Dropped %s (walk into it)." % drop.label()
+
+
+static func _xp(args: PackedStringArray, game: Game) -> String:
+	if game.get_human() == null:
+		return "No local player."
+	if args.is_empty() or not args[0].is_valid_int() or args[0].to_int() <= 0:
+		return "Usage: xp <n>"
+	var gained := game.progression.grant_xp(PlayerRegistry.HOST_ID, args[0].to_int())
+	var state := game.progression.get_state(PlayerRegistry.HOST_ID)
+	var text := "XP %d, level %d (%d into the next, %d needed)." % [state.xp, state.level, state.xp_into_level(), state.xp_needed()]
+	if gained > 0:
+		text += " Level up! Pick a perk with Z, X or C."
+	return text
+
+
+static func _perk(args: PackedStringArray, game: Game) -> String:
+	var state := game.progression.get_state(PlayerRegistry.HOST_ID)
+	if state == null:
+		return "No local player."
+	var sub := args[0].to_lower() if not args.is_empty() else "list"
+	if sub == "list":
+		var lines: Array[String] = []
+		for id in game.perk_defs.ids():
+			var def := game.perk_defs.get_def(id)
+			lines.append("  %-12s %d/%d  %s" % [id, state.stacks_of(id), def.max_stacks, def.description])
+		return "\n".join(lines)
+	if sub == "give":
+		if args.size() < 2:
+			return "Usage: perk give <id>"
+		var id := StringName(args[1].to_lower())
+		if not game.perk_defs.has(id):
+			return "Unknown perk '%s'. Try perk list." % args[1]
+		if not game.progression.apply_perk(PlayerRegistry.HOST_ID, id):
+			return "%s is already at its maximum." % game.perk_defs.get_def(id).display_name
+		return "Gave %s (now %d)." % [game.perk_defs.get_def(id).display_name, state.stacks_of(id)]
+	return "Usage: perk list | give <id>"
+
+
+static func _sp(args: PackedStringArray, game: Game) -> String:
+	if game.get_human() == null:
+		return "No local player."
+	if args.is_empty() or not args[0].is_valid_int():
+		return "Usage: sp <n>"
+	game.progression.grant_sabotage_points(PlayerRegistry.HOST_ID, args[0].to_int())
+	return "Sabotage Points: %d." % game.progression.get_state(PlayerRegistry.HOST_ID).sabotage_points
+
+
+static func _heal(game: Game) -> String:
+	var vitals := game.combat.get_vitals(PlayerRegistry.HOST_ID)
+	if vitals == null:
+		return "No local player."
+	game.combat.heal(PlayerRegistry.HOST_ID, vitals.max_hp)
+	return "Healed."
+
+
+static func _botpve(args: PackedStringArray, game: Game) -> String:
+	var level := 1
+	if not args.is_empty():
+		if not args[0].is_valid_int():
+			return "Usage: botpve [0-2] [bot id]"
+		level = clampi(args[0].to_int(), 0, 2)
+	var bot_id := 0
+	if args.size() > 1:
+		if not args[1].is_valid_int():
+			return "Usage: botpve [0-2] [bot id]"
+		bot_id = args[1].to_int()
+	else:
+		for id in game.registry.ids():
+			if game.registry.get_record(id).kind == PlayerRegistry.Kind.BOT:
+				bot_id = id
+				break
+	if bot_id == 0 or game.registry.get_record(bot_id) == null or game.registry.get_record(bot_id).kind != PlayerRegistry.Kind.BOT:
+		return "No such bot. Spawn one with: bot"
+	var result := game.run_bot_pve(bot_id, level)
+	var state := game.progression.get_state(bot_id)
+	return "Bot %d (skill %.2f): %s, %d kills, boss %s, %d deaths, score %d, +%d XP (level %d), +%d Sabotage Points." % [
+		bot_id, BotPveModel.skill_for_level(level), String(result.reason), result.kill_count(),
+		"defeated" if result.boss_defeated else "standing", result.deaths, result.score, result.xp, state.level, result.sabotage_points]

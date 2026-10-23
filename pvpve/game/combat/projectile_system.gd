@@ -4,9 +4,8 @@ extends RefCounted
 ## turns the returned impacts into health changes. Collision is a segment raycast per tick
 ## (continuous), so fast arrows cannot tunnel through players or walls.
 
-const COLLISION_MASK := 3  # world (1) + players (2)
-
 class Impact extends RefCounted:
+	## PLAYER means any combatant (a player or a monster) was hit.
 	enum Kind { PLAYER, WORLD, EXPIRED }
 	var projectile: Projectile
 	var kind := Kind.EXPIRED
@@ -63,15 +62,15 @@ func step(tick: int, space: PhysicsDirectSpaceState3D, owner_rid: Callable, dt: 
 		var rid: RID = owner_rid.call(projectile.owner_id)
 		if rid.is_valid():
 			exclude.append(rid)
-		var query := PhysicsRayQueryParameters3D.create(from, to, COLLISION_MASK, exclude)
+		var query := PhysicsRayQueryParameters3D.create(from, to, projectile.mask, exclude)
 		var hit := space.intersect_ray(query)
 		if not hit.is_empty():
 			var impact := Impact.new()
 			impact.projectile = projectile
 			impact.position = hit.position
-			if hit.collider is Player:
+			if hit.collider is Combatant:
 				impact.kind = Impact.Kind.PLAYER
-				impact.target_id = (hit.collider as Player).player_id
+				impact.target_id = (hit.collider as Combatant).entity_id
 			else:
 				impact.kind = Impact.Kind.WORLD
 			impacts.append(impact)

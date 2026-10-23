@@ -1,0 +1,42 @@
+[gd_resource type="Resource" script_class="MonsterDef" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://game/pve/monster_def.gd" id="1_def"]
+[ext_resource type="Resource" path="res://content/monsters/boss_orb.tres" id="2_spit"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"warden"
+display_name = &"Warden"
+radius = 1.1
+height = 3.4
+color = Color(0.25, 0.2, 0.35, 1)
+max_hp = 900.0
+move_speed = 3.4
+melee_damage = 0.0
+slam_damage = 35.0
+slam_radius = 4.5
+slam_windup = 0.8
+slam_cooldown = 3.5
+charge_damage = 30.0
+charge_windup = 0.9
+charge_speed = 15.0
+charge_time = 1.3
+charge_cooldown = 7.0
+stun_time = 1.2
+spit_count = 3
+spit_spread_deg = 12.0
+spit_range = 30.0
+spit_windup = 0.7
+spit_interval = 4.0
+keep_distance = 0.0
+summon_id = &"grunt"
+summon_count = 4
+summon_at_fraction = 0.5
+enrage_fraction = 0.35
+is_boss = true
+score_value = 300
+xp = 400
+sabotage_points = 8
+loot_chance = 1.0
+sight_range = 120.0
+spit = ExtResource("2_spit")

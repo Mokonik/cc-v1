@@ -26,3 +26,36 @@ signal explosion(position: Vector3, radius: float, weapon_id: StringName)
 signal damage_dealt(target_id: int, source_id: int, amount: float, position: Vector3, weapon_id: StringName)
 signal player_died(victim_id: int, killer_id: int, weapon_id: StringName)
 signal player_respawned(player_id: int)
+signal monster_killed(monster_id: int, killer_id: int, position: Vector3, def_id: StringName)
+signal weapon_tier_changed(player_id: int, weapon_id: StringName, tier: int)
+signal monster_spawned(monster_id: int, def_id: StringName, position: Vector3)
+## A monster started winding up an attack ("melee", "spit", "slam" or "charge").
+signal monster_telegraph(monster_id: int, ability: StringName, seconds: float)
+## An attack landed or fired. radius is the area it covers (0 for single-target attacks).
+signal monster_attack(monster_id: int, ability: StringName, position: Vector3, radius: float)
+
+# PvE phase (one run per participant).
+signal pve_started(owner_id: int, phase_seconds: float)
+## phase_name is "countdown", "waves" or "boss"; seconds is how long it lasts.
+signal pve_phase(owner_id: int, phase_name: StringName, seconds: float)
+signal pve_wave(owner_id: int, wave: int, count: int)
+signal pve_finished(owner_id: int, result: PveResult, reason: StringName)
+## A gate is about to release a monster; presentation makes it glow.
+signal gate_pulse(owner_id: int, gate_index: int, seconds: float)
+
+# Progression.
+signal xp_changed(player_id: int, xp: int, level: int)
+signal level_up(player_id: int, level: int)
+## A level-up queued three perks to choose from.
+signal perk_offered(player_id: int, perk_ids: Array)
+signal perk_picked(player_id: int, perk_id: StringName)
+signal sabotage_points_changed(player_id: int, points: int)
+
+# Loot, consumables and traps.
+signal loot_dropped(drop_id: int, kind: int, label: String, position: Vector3)
+signal loot_picked_up(player_id: int, drop_id: int, kind: int, label: String)
+signal loot_removed(drop_id: int)
+signal item_used(player_id: int, item: StringName, amount: float)
+signal trap_placed(trap_id: int, owner_id: int, position: Vector3)
+signal trap_armed(trap_id: int)
+signal trap_triggered(trap_id: int, victim_id: int, position: Vector3)

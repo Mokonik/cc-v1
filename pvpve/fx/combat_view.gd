@@ -51,6 +51,7 @@ func _ready() -> void:
 	events.explosion.connect(_on_explosion)
 	events.damage_dealt.connect(_on_damage_dealt)
 	events.player_died.connect(_on_player_died)
+	events.monster_spawned.connect(_on_monster_spawned)
 
 
 func _process(_delta: float) -> void:
@@ -87,9 +88,17 @@ func _on_weapon_changed(player_id: int, weapon_id: StringName) -> void:
 		_viewmodel.show_weapon(weapon_id)
 
 
-func _add_bar(player: Player) -> void:
+func _on_monster_spawned(monster_id: int, _def_id: StringName, _position: Vector3) -> void:
+	var body := game.monsters.get_body(monster_id)
+	if body != null:
+		_add_bar(body, body.def.height + 0.55, body.def.is_boss)
+
+
+func _add_bar(player: Combatant, height := 2.25, is_boss := false) -> void:
 	var holder := Node3D.new()
-	holder.position = Vector3(0.0, 2.25, 0.0)
+	holder.position = Vector3(0.0, height, 0.0)
+	if is_boss:
+		holder.scale = Vector3(2.4, 2.4, 2.4)
 	var bar := MeshInstance3D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2(1.0, 0.11)
@@ -108,15 +117,17 @@ func _add_bar(player: Player) -> void:
 	label.outline_size = 8
 	holder.add_child(label)
 	player.add_child(holder)
-	_bars[player.player_id] = {"holder": holder, "material": material}
+	_bars[player.entity_id] = {"holder": holder, "material": material}
 
 
 func _update_bars() -> void:
-	for id: int in _bars:
+	for id: int in _bars.keys():
 		var entry: Dictionary = _bars[id]
-		var holder: Node3D = entry.holder
-		if not is_instance_valid(holder):
+		# The bar is a child of its combatant, so it is freed with it: check before typing it.
+		if not is_instance_valid(entry.holder):
+			_bars.erase(id)
 			continue
+		var holder: Node3D = entry.holder
 		var vitals := game.combat.get_vitals(id)
 		if vitals == null:
 			continue
@@ -252,7 +263,27 @@ func _on_player_died(victim_id: int, _killer_id: int, _weapon_id: StringName) ->
 
 func _on_projectile_spawned(projectile_id: int, weapon_id: StringName, position: Vector3, _velocity: Vector3) -> void:
 	var visual := Node3D.new()
-	if weapon_id == &"orb":
+	if weapon_id == &"spit" or weapon_id == &"boss_orb":
+		var glob := MeshInstance3D.new()
+		var sphere := SphereMesh.new()
+		sphere.radius = 0.16 if weapon_id == &"spit" else 0.3
+		sphere.height = sphere.radius * 2.0
+		glob.mesh = sphere
+		var glob_material := StandardMaterial3D.new()
+		var tint := Color(0.5, 1.0, 0.3) if weapon_id == &"spit" else Color(0.75, 0.3, 1.0)
+		glob_material.albedo_color = tint
+		glob_material.emission_enabled = true
+		glob_material.emission = tint
+		glob_material.emission_energy_multiplier = 2.0
+		glob.material_override = glob_material
+		glob.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		visual.add_child(glob)
+		var glow := OmniLight3D.new()
+		glow.light_color = tint
+		glow.light_energy = 1.2
+		glow.omni_range = 4.0
+		visual.add_child(glow)
+	elif weapon_id == &"orb":
 		var mesh_instance := MeshInstance3D.new()
 		var sphere := SphereMesh.new()
 		sphere.radius = 0.2

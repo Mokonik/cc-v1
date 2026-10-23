@@ -6,56 +6,6 @@ const TICK := 60
 ## Human spawn (index 0): z = 22 facing -Z. Dummies are placed straight ahead of it.
 const HUMAN_SPAWN := Vector3(0.0, 0.1, 22.0)
 
-## Replaces the human's keyboard source so a test controls every command.
-class ScriptedSource extends InputSource:
-	var yaw := 0.0
-	var pitch := 0.0
-	var fire_held := false
-	var _fire_pressed := false
-	var _fire_released := false
-	var _reload := false
-	var _slot := 0
-	var _cycle := 0
-
-	func press_fire() -> void:
-		fire_held = true
-		_fire_pressed = true
-
-	func release_fire() -> void:
-		fire_held = false
-		_fire_released = true
-
-	func reload() -> void:
-		_reload = true
-
-	func select(slot: int) -> void:
-		_slot = slot
-
-	func cycle(direction: int) -> void:
-		_cycle = direction
-
-	func poll(_delta: float) -> PlayerCommand:
-		var command := PlayerCommand.new()
-		command.yaw = yaw
-		command.pitch = pitch
-		command.fire_held = fire_held
-		command.fire_pressed = _fire_pressed
-		command.fire_released = _fire_released
-		command.reload_pressed = _reload
-		command.weapon_slot = _slot
-		command.weapon_cycle = _cycle
-		_fire_pressed = false
-		_fire_released = false
-		_reload = false
-		_slot = 0
-		_cycle = 0
-		return command
-
-	func set_view(new_yaw: float, new_pitch: float) -> void:
-		yaw = new_yaw
-		pitch = new_pitch
-
-
 var _failures := 0
 var _main: Node
 

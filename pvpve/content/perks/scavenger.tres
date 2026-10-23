@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="PerkDef" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://game/pve/perk_def.gd" id="1_def"]
+
+[resource]
+script = ExtResource("1_def")
+id = &"scavenger"
+display_name = "Scavenger"
+description = "+8% loot chance and +1 Sabotage Point per kill."
+max_stacks = 3
+loot_chance_bonus = 0.08
+sabotage_point_bonus = 1
