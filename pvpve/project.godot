@@ -1,0 +1,19 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+
+config_version=5
+
+[application]
+
+config/name="PvPvE Loop Arena"
+run/main_scene="res://world/main.tscn"
+config/features=PackedStringArray("4.4", "Forward Plus")
+
+[physics]
+
+common/physics_ticks_per_second=60
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2
